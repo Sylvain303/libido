@@ -11,6 +11,18 @@ By inserting comment (or not) with libido keyword you can expand/update some par
 
 OK, a kind of super sed, with a nice syntax to extract, fetch, update inline chunk of code. See bellow.
 
+## Written in C
+
+Old school programming. OK may be. But lightning fast!
+
+* GNU flex - lexical analyser
+* GNU make and gcc
+
+## Current feature
+* UTF-8 support
+* parse an external source to match code fragment
+* COV 100 % (Code coverage with unittesting) unittesting is testing 100% of the code lines.
+
 ## Usage
 
 examples/readme_ex0.sh
@@ -56,6 +68,8 @@ search_scan_offset=0
 libido_keyword=libido
 git_auto_commit=true
 auto_inc_duplicate=true
+auto_quote_string=always|nospace|protected_chars
+disable_add_ref=false
 ~~~
 
 ## Command line
@@ -73,8 +87,6 @@ OPTIONS:
 
 exporting is a way of collecting fresh crafted piece of code into your lib.
 
-
-
 ## Lexical analyser with flex
 http://flex.sourceforge.net/manual/Simple-Examples.html#Simple-Examples
 
@@ -84,3 +96,8 @@ http://flex.sourceforge.net/manual/Simple-Examples.html#Simple-Examples
 * [cpp](http://gcc.gnu.org/onlinedocs/cpp/) - C preprocessor
 * [sed](https://www.gnu.org/software/sed/manual/sed.html) - stream editor
 * [gpp](http://en.nothingisreal.com/wiki/GPP) - general-purpose preprocessor
+
+## snipMate
+Having snippet autocompletable in code
+* http://www.vim.org/scripts/script.php?script_id=2540 - vim snipMate
+* https://github.com/garbas/vim-snipmate
