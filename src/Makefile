@@ -1,4 +1,6 @@
 
+all: libido lexer
+
 libido: lex.yy.c functions.o functions.h
 	gcc functions.o libido.c -o libido 
 
@@ -7,3 +9,6 @@ lexer: lex.yy.c
 
 lex.yy.c: lexer.l
 	flex lexer.l
+
+clean:
+	rm -f lex.yy.c *.o lexer libio
