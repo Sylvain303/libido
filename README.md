@@ -15,13 +15,15 @@ OK, a kind of super sed, with a nice syntax to extract, fetch, update inline chu
 
 Old school programming. OK may be. But lightning fast!
 
-* GNU flex - lexical analyser
+* GNU flex and bison for lexical analyser and grammar parser
 * GNU make and gcc
 
 ## Current feature
 * UTF-8 support
-* parse an external source to match code fragment
+* parse an external source to match code fragment (See [example](examples/libido/shell_lib.bash))
 * COV 100 % (Code coverage with unittesting) unittesting is testing 100% of the code lines.
+
+## Unittesting
 
 ## Usage
 
@@ -88,7 +90,9 @@ OPTIONS:
 exporting is a way of collecting fresh crafted piece of code into your lib.
 
 ## Lexical analyser with flex
-http://flex.sourceforge.net/manual/Simple-Examples.html#Simple-Examples
+* [flex](http://flex.sourceforge.net/manual/Simple-Examples.html#Simple-Examples)
+* [bison](https://www.gnu.org/software/bison/manual/html_node/index.html#SEC_Contents)
+
 
 ## Other preprocessor like program
 
