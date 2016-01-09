@@ -1,4 +1,4 @@
-/* 
+/*
  * lexer for parsing external source for collecting snippet of code.
  */
 
@@ -8,44 +8,71 @@
 %}
 
 %{
-int *nlines;
 void p(char *what, char *val)
 {
     if(what[0] == '<')
-        printf("%d:\033[32;1m%s\033[0m:%s", *nlines, ++what, val);
+        printf("\033[31;1m<\033[0m%d:\033[32;1m%s\033[0m:%s\033[31;1m>\033[0m", yylineno, ++what, val);
     else
-        printf("%d:\033[32;1m%s\033[0m:%s\n", *nlines, what, val);
+        printf("%d:\033[32;1m%s\033[0m:%s\n", yylineno, what, val);
 }
 
+#define FALSE 0
+#define TRUE 1
 #define RET(val) p(#val, yytext); return val
+/* macro for changing start condition from bison */
+#define CHANGE_IF(mode) if(mode ## _change) { \
+                          printf(#mode " ENTER\n");\
+                          BEGIN(mode);\
+                          mode ## _change = FALSE;\
+                        }
+#define INT_CHANGER(name) int name ## _change = 0;
 %}
-    int num_lines = 1;
+    INT_CHANGER(function_body);
+    INT_CHANGER(unparsed_code);
 
 
 IDENTIFIER  [A-Za-z][A-Za-z0-9_]*
 COMMENT     #
 INDENT      ^[ \t]+
 
+
+%option   yylineno
+
 /* exclusive start condition */
-%x comment libido
+%x comment libido function_body code unparsed_code
 %%
 
+    /* helpers, will change start condition from bison */
+    CHANGE_IF(function_body);
+    CHANGE_IF(unparsed_code);
+
 <comment>libido:        p("<libido=>", ""); BEGIN(libido);
-<comment>\n             ++num_lines; BEGIN(0);
-<comment>.+             RET(COMMENT);
+<comment>\n             BEGIN(0);
+<comment>.              /* skip */;
 
 <libido>depend          RET(DEPEND);
-<libido>{IDENTIFIER}    p("<ID", yytext);
-<libido>\n              ++num_lines; BEGIN(0);
+<libido>verbatim        RET(VERBATIM);
+<libido>{IDENTIFIER}    RET(IDENTIFIER);
+<libido>\n              BEGIN(0);
 <libido>[[:blank:]]+    ;
-<libido>.               p("<C", yytext); return yytext[0];
+<libido>.               p("<l", yytext); return yytext[0];
 
+<function_body>{INDENT}         BEGIN(code); RET(INDENT);
+<function_body>{COMMENT}[^\n]+  RET(COMMENT_LINE);
+<function_body>\n               ;
+<function_body>\}               BEGIN(0); return '}';
 
-{COMMENT}               p("COM", yytext); BEGIN(comment);
-{IDENTIFIER}            RET(IDENTIFIER);
-{INDENT}                RET(INDENT);
-[[:blank:]]+            ;
-\n                      ++num_lines;
-.                       p("<c", yytext); return yytext[0];
+<code>{COMMENT}.*               BEGIN(function_body); RET(COMMENT_LINE);
+<code>.*                        BEGIN(function_body); RET(CODE);
+
+<unparsed_code>{COMMENT}[ \t]*libido:   BEGIN(libido);
+<unparsed_code>.                        ;
+<unparsed_code>\n                       ;
+
+{COMMENT}           p("COM", yytext); BEGIN(comment);
+{IDENTIFIER}        RET(IDENTIFIER);
+[ \t]+              ;
+\n                  ;
+.                   p("<c", yytext); return yytext[0];
 
 %%

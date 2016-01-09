@@ -1,13 +1,16 @@
-CCFLAS=-g
-CC=gcc ${CCFLAS}
+CFLAGS=-g -DYYDEBUG=1
+CC=gcc ${CFLAGS}
 
 all: bash_parser
 
 bash_parser: lex.yy.o bash_parser.tab.c
 	${CC} -o bash_parser bash_parser.tab.c lex.yy.o -lfl
 
+# -d generate tab.h for inclusion in lexer.l
+# -g graph
+# -W warning
 bash_parser.tab.c: bash_parser.y
-	bison -d bash_parser.y
+	bison -d -g -W bash_parser.y
 
 libido: lex.yy.c functions.o functions.h
 	${CC} functions.o libido.c -o libido 
