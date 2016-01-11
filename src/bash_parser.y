@@ -20,7 +20,8 @@ int make_list(int e1, int e2) { return 2; }
 #define ENTER(lexer_sc) lexer_sc ## _change = 1
 %}
 
-%token CODE COMMENT COMMENT_LINE DEPEND FUNCTION IDENTIFIER INDENT VERBATIM UNPARSED_CODE
+%token BASH_KEYWORD BASH_PONCTUATION BASH_STRING BASH_VAR CODE COMMENT COMMENT_LINE 
+%token DEPEND FUNCTION IDENTIFIER INDENT LIBIDO UNPARSED_CODE VERBATIM
 
 /* trick: r!grep -o '[A-Z_]\{2,\}' < % | sort -u */
 
@@ -47,7 +48,12 @@ bash_code:
 code_blocks:
     comment_block
   | function_def
-  | verbatim_chunk
+  | libido_statment
+  | free_code
+  ;
+
+libido_statment:
+    verbatim_chunk
   | libido_dependency
   ;
 
@@ -67,6 +73,18 @@ function_body:
   '}'
   ;
 
+free_code:
+    BASH_KEYWORD
+  | BASH_STRING
+  | BASH_VAR
+  | free_code ';' free_code
+  | IDENTIFIER
+  | BASH_PONCTUATION
+  | INDENT
+  | CODE
+  ;
+
+
 lines_of_indented_code:
     %empty
   | lines_of_indented_code indented_code
@@ -79,7 +97,7 @@ indented_code:
   ;
 
 verbatim_chunk:
-  VERBATIM '(' IDENTIFIER ')' '{'   { ENTER(unparsed_code); }
+  LIBIDO VERBATIM '(' IDENTIFIER ')' '{'   { ENTER(unparsed_code); }
     chunk_of_unparsed_code
   '}'
   ;

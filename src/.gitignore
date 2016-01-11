@@ -3,3 +3,8 @@
 lexer
 lex.yy.c
 *.tab.[ch]
+bash_parser
+bash_parser.dot
+bash_parser.png
+bash_parser.output
+a.out

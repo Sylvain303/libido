@@ -12,18 +12,24 @@ bash_parser: lex.yy.o bash_parser.tab.c
 bash_parser.tab.c: bash_parser.y
 	bison -d -g -W bash_parser.y
 
-libido: lex.yy.c functions.o functions.h
-	${CC} functions.o libido.c -o libido 
+bash_parser.tab.h: bash_parser.tab.c
+	touch $@
 
-lexer: lex.yy.c
-	${CC} -o lexer lex.yy.c -lfl
+libido: lex.yy.c functions.o functions.h
+	${CC} functions.o libido.c -o libido
+
+# build only the lexer, used by unittest too
+# for debuging -DDEBUG=1 too
+lexer: lex.yy.c bash_parser.tab.h
+	${CC} -o lexer lex.yy.c -D TEST_LEXER=1 -lfl
 
 lex.yy.o: lex.yy.c bash_parser.tab.c
-	${CC} -c lex.yy.c
+	${CC} -DDEBUG=1 -c lex.yy.c
 
 lex.yy.c: lexer.l
 	flex lexer.l
 
+# experimentation maybe not commited code
 calc: calc.tab.c
 	${CC} -o calc calc.tab.c -lm
 
@@ -32,8 +38,8 @@ calc.tab.c: calc.y
 
 # pkg-config will find cflags for glib, see /usr/lib/x86_64-linux-gnu/pkgconfig/glib-2.0.pc
 glib_ex1: glib_ex1.c
-	${CC} -o glib_ex1 glib_ex1.c  \
-		$$(pkg-config --cflags --libs glib-2.0)
+	${CC} -o glib_ex1 glib_ex1.c $$(pkg-config --cflags --libs glib-2.0)
+
 hcreate_r: hcreate_r.c
 	${CC} -o hcreate_r hcreate_r.c
 
