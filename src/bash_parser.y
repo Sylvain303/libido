@@ -21,7 +21,7 @@ int make_list(int e1, int e2) { return 2; }
 %}
 
 %token BASH_KEYWORD BASH_PONCTUATION BASH_STRING BASH_VAR CODE COMMENT COMMENT_LINE 
-%token DEPEND FUNCTION IDENTIFIER INDENT LIBIDO UNPARSED_CODE VERBATIM
+%token DEPEND FUNCTION IDENTIFIER INDENT LIBIDO NUMBER STRING VERBATIM
 
 /* trick: r!grep -o '[A-Z_]\{2,\}' < % | sort -u */
 
@@ -47,19 +47,19 @@ bash_code:
 
 code_blocks:
     comment_block
+  | free_code
   | function_def
   | libido_statment
-  | free_code
   ;
 
 libido_statment:
-    verbatim_chunk
-  | libido_dependency
+    LIBIDO verbatim_chunk
+  | LIBIDO libido_dependency
   ;
 
 comment_block:
-    comment_block COMMENT
-  | COMMENT
+    COMMENT
+  | comment_block COMMENT
   ;
 
 function_def:
@@ -68,25 +68,34 @@ function_def:
   ;
 
 function_body:
-  '{'                           { ENTER(function_body); }
+  '{'
      lines_of_indented_code
   '}'
   ;
 
 free_code:
+    bash_token
+  | free_code bash_token
+  | '{' bash_code '}'
+  ;
+
+bash_token:
     BASH_KEYWORD
   | BASH_STRING
   | BASH_VAR
-  | free_code ';' free_code
+  | ';'
   | IDENTIFIER
   | BASH_PONCTUATION
-  | INDENT
-  | CODE
+  | NUMBER
+  | STRING
+  | '='
+  | lines_of_indented_code
+  | comment_block
   ;
 
 
 lines_of_indented_code:
-    %empty
+    indented_code
   | lines_of_indented_code indented_code
   ;
 
@@ -97,14 +106,9 @@ indented_code:
   ;
 
 verbatim_chunk:
-  LIBIDO VERBATIM '(' IDENTIFIER ')' '{'   { ENTER(unparsed_code); }
-    chunk_of_unparsed_code
-  '}'
-  ;
-
-chunk_of_unparsed_code:
-    %empty
-  | chunk_of_unparsed_code UNPARSED_CODE
+  VERBATIM '(' IDENTIFIER ')' '{'
+    free_code
+  LIBIDO '}'
   ;
 
 libido_dependency:
@@ -126,6 +130,8 @@ entity:
   */
 int main(int argc, char **argv) {
     int filepos = 1;
+
+    init_bash_keywords();
 
     /* switch to debug mode */
     if(strcmp(argv[1], "-d") == 0) {
