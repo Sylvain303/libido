@@ -7,5 +7,5 @@ compare expect_bash.parsed result_bash.parsed
 # granular testing
 
 ## test case
-## error matching
 
+## error matching
