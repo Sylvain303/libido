@@ -3,7 +3,7 @@ CC=gcc ${CFLAGS}
 
 all: bash_parser
 
-bash_parser: lex.yy.o bash_parser.tab.c
+bash_parser: lex.yy.o bash_parser.tab.c bash_keywords.o
 	${CC} -o bash_parser bash_parser.tab.c lex.yy.o -lfl bash_keywords.o
 
 # -d generate tab.h for inclusion in lexer.l
@@ -23,7 +23,7 @@ libido: lex.yy.c functions.o functions.h
 lexer: lex.yy.c bash_parser.tab.h bash_keywords.o
 	${CC} -o lexer lex.yy.c -D TEST_LEXER=1 -lfl bash_keywords.o
 
-lex.yy.o: lex.yy.c bash_parser.tab.c bash_keywords.h bash_keywords.c
+lex.yy.o: lex.yy.c bash_parser.tab.h bash_keywords.h bash_keywords.c
 	${CC} -DDEBUG=1 -c lex.yy.c
 
 lex.yy.c: lexer.l
@@ -47,4 +47,4 @@ hcreate_r: hcreate_r.c
 	${CC} -o hcreate_r hcreate_r.c
 
 clean:
-	rm -f lex.yy.c *.o lexer libio glib_ex1 hcreate_r *.tab.[ohc]
+	rm -f lex.yy.c *.o lexer libio glib_ex1 hcreate_r *.tab.[ohc] bash_parser *.dot *.output

@@ -76,19 +76,19 @@ BASH_PONCTUATION    [[\]*<>|!&]{1,2}|==|!=
 %%
 
 <comment>libido:        BEGIN(libido); RET(LIBIDO);
-<comment>\n             BEGIN(0);
+<comment>\n             BEGIN(0); RETNL;
 <comment>.              /* skip */;
 
 <libido>depend          RET(DEPEND);
 <libido>verbatim        RET(VERBATIM);
 <libido>{IDENTIFIER}    RET(IDENTIFIER);
-<libido>\n              BEGIN(0);
+<libido>\n              BEGIN(0); RETNL;
 <libido>[[:blank:]]+    ;
 <libido>.               RETC("<l", yytext[0]);
 
 <code>{COMMENT}.*       RET(COMMENT_LINE);
 <code>.*                RET(CODE);
-<code>\n                BEGIN(0);
+<code>\n                BEGIN(0); RETNL;
 
 <string>\\\"        buffer_add(&collected, yytext);
 <string>[^"]+       buffer_add(&collected, yytext);
@@ -104,7 +104,7 @@ BASH_PONCTUATION    [[\]*<>|!&]{1,2}|==|!=
 {BASH_PONCTUATION}      RET(BASH_PONCTUATION);
 {BASH_TEST}             RET(BASH_PONCTUATION);
 [ \t]+                  ;
-\n                      ;
+\n                      ; RETNL;
 .                       RETC("<c", yytext[0]);
 
 %%
