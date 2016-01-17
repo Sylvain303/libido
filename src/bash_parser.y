@@ -21,9 +21,9 @@ int make_list(int e1, int e2) { return 2; }
 %}
 
 %token BASH_KEYWORD BASH_PONCTUATION BASH_STRING BASH_VAR CODE COMMENT COMMENT_LINE 
-%token DEPEND FUNCTION IDENTIFIER INDENT LIBIDO NUMBER STRING VERBATIM
+%token DEPEND FUNCTION IDENTIFIER INDENT LIBIDO NUMBER STRING UNPARSED VERBATIM 
 
-/* trick: r!grep -o '[A-Z_]\{2,\}' < % | sort -u */
+/* trick to extract %token: r!grep -o '[A-Z_]\{2,\}' < % | sort -u */
 
 %verbose
 %define parse.error verbose
@@ -48,9 +48,12 @@ bash_code:
 
 code_block:
     function_def
+  | comment
+  ;
+
+comment:
+    COMMENT
   | COMMENT libido_statment
-  | COMMENT '\n'
-  | '\n'
   ;
 
 libido_statment:
@@ -59,62 +62,41 @@ libido_statment:
   ;
 
 function_def:
-    FUNCTION IDENTIFIER '(' ')' newline_list function_body
-  | FUNCTION IDENTIFIER newline_list function_body
-  | IDENTIFIER '(' ')' newline_list function_body
-  ;
-
-newline_list:
-    %empty
-  | newline_list '\n'
+    FUNCTION IDENTIFIER '(' ')' function_body
+  | FUNCTION IDENTIFIER function_body
+  | IDENTIFIER '(' ')' function_body
   ;
 
 function_body:
-  '{'
+  '{'                              { ENTER(function_body); }
      lines_of_indented_code
   '}'
   ;
 
 lines_of_indented_code:
-    newline_list indented_code
+    indented_code
   | lines_of_indented_code indented_code
   ;
 
 indented_code:
-    INDENT CODE '\n'
-  | COMMENT_LINE '\n'
-  | INDENT COMMENT_LINE '\n'
+    INDENT CODE
+  | COMMENT_LINE
+  | INDENT COMMENT_LINE
   ;
-
-free_code:
-    bash_line '\n'
-  | '{' bash_code '}'
-  | function_def
-  | COMMENT '\n'
-  ;
-
-bash_line:
-    bash_line bash_line
-    BASH_KEYWORD
-  | BASH_STRING
-  | BASH_VAR
-  | ';'
-  | IDENTIFIER
-  | BASH_PONCTUATION
-  | NUMBER
-  | STRING
-  | '='
-  ;
-
 
 verbatim_chunk:
-  VERBATIM '(' IDENTIFIER ')' '{' '\n'
-    newline_list free_code
-  COMMENT LIBIDO '}' '\n'
+  VERBATIM '(' IDENTIFIER ')' '{'   { ENTER(unparsed_code); }
+    unparsed_lines
+  LIBIDO '}'
+  ;
+
+unparsed_lines:
+    UNPARSED
+  | unparsed_lines UNPARSED
   ;
 
 libido_dependency:
-  DEPEND '(' entities ')' '\n'
+  DEPEND '(' entities ')'
   ;
 
 entities:
@@ -133,7 +115,7 @@ entity:
 int main(int argc, char **argv) {
     int filepos = 1;
 
-    init_bash_keywords();
+    initilize_lexer();
 
     /* switch to debug mode */
     if(strcmp(argv[1], "-d") == 0) {

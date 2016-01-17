@@ -6,10 +6,10 @@ What?
 
 libido stand for maximizing your pleasure! => lib I do
 
-libido is a smart text preprocessor/editor which modify inline your code!
-By inserting comment (or not) with libido keyword you can expand/update some part of your code with your lovely crafted snipet.
+`libido` is a smart text preprocessor/editor which modifies your code inline!
+By inserting comment (or not) with `libido:` keyword you can expand/update some part of your code with your lovely crafted snipet.
 
-OK, a kind of super sed, with a nice syntax to extract, fetch, update inline chunk of code. See bellow.
+OK, a kind of super `sed`, with a nice syntax to extract, fetch, update inline chunk of code. See bellow.
 
 ## Written in C
 
@@ -18,16 +18,25 @@ Old school programming. OK may be. But lightning fast!
 * GNU flex and bison for lexical analyser and grammar parser
 * GNU make and gcc
 
-## Current feature
-* UTF-8 support
-* parse an external source to match code fragment (See [example](examples/libido/shell_lib.bash))
-* COV 100 % (Code coverage with unittesting) unittesting is testing 100% of the code lines.
+## Current status
+
+Draft and prototype.
+
+* some test with googleTest in test/
+* some test with bats in test/
+* parse an external source to match code token with the grammar (See [example](examples/libido/shell_lib.bash))
+* some prototype in C for buffering data
+* Makefiles OK.
 
 ## Unittesting
+* GoogleTest for C
+* bats for funcitonnal testing in bash
 
-## Usage
+## Usage - Example
 
-examples/readme_ex0.sh
+What will be achieved when working
+
+File: examples/readme_ex0.sh
 
 ~~~bash
 #!/bin/bash 

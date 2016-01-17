@@ -1,5 +1,9 @@
 # Steps to achieve libido
 
+## Features wanted
+* UTF-8 support
+* code coverage 100% (COV with unittest) 
+
 ## first lexer
 
 With GNU flex and bison build an initial lexer that can:
@@ -19,3 +23,6 @@ main libido will
 * parse an input file for text processing and a reference libsource (harcoded) and will substitue on stdout.
 
 ## config parser
+
+
+vim: set ft=markdown

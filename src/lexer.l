@@ -9,6 +9,9 @@
 #include "buf_string.c"
 #include "bash_keywords.h"
 
+/* linked list */
+#include "collected_lines.h"
+
 /* helper */
 void p(char *what, char *val)
 {
@@ -18,21 +21,26 @@ void p(char *what, char *val)
         printf("%d:\033[32;1m%s\033[0m:%s\n", yylineno, what, val);
 }
 
-#define FALSE 0
-#define TRUE 1
+#ifndef TRUE
+# define FALSE 0
+# define TRUE 1
+#endif
+
+/* Collecting lines */
+#define COLLECT()   current_line = add_new_line(&lines, current_line)
+#define ADD(str)    buffer_add(current_line, str)
 
 #ifdef DEBUG
 #  define DEBUG_p(fmt, val) p(fmt, val);
-#  define RET(val) p(#val, yytext); return val
-#  define RETC(fmt, val) p(fmt, yytext); return val
-#  define RETB(val)      printf(#val ":%s\n", collected.str); return val
-#  define RETNL          return '\n'
+#  define RET(val)          p(#val, yytext); ADD(yytext); return val
+#  define RETC(fmt, val)    p(fmt, yytext); ADD(yytext); return val
+#  define RETNL             ADD(yytext); return '\n'
 #else
+   /* NORMAL mode */
 #  define DEBUG_p(fmt, val) /* empty */
-#  define RET(val)       return val
-#  define RETC(fmt, val) return val
-#  define RETB(val)      return val
-#  define RETNL          return '\n'
+#  define RET(val)          ADD(yytext); return val
+#  define RETC(fmt, val)    ADD(yytext); return val
+#  define RETNL             ADD(yytext); return '\n'
 #endif
 
 /* See Makefile and ../test/lexer.bats */
@@ -40,12 +48,10 @@ void p(char *what, char *val)
 /* redefine macros for testing */
 #  undef RET
 #  undef RETC
-#  undef RETB
 #  undef RETNL
-#  define RET(val)       printf(#val":%s\n", yytext); return val
-#  define RETC(fmt, val) printf("%c\n", val); return val
-#  define RETB(val)      printf(#val ":%s\n", collected.str); return val
-#  define RETNL          printf("\\n\n"); return '\n'
+#  define RET(val)       printf(#val":%s\n", yytext); ADD(yytext); return val
+#  define RETC(fmt, val) printf("%c\n", val); ADD(yytext); return val
+#  define RETNL          printf("\\n\n"); ADD(yytext); return '\n'
 #endif
 
 /* macro for changing start condition from bison */
@@ -59,7 +65,12 @@ void p(char *what, char *val)
 %}
 
     /* variable definition */
-    StringBuf collected;
+    StringBuf *current_line;
+    CollectedLines lines;
+
+    /* declare intger boolean changer for strat conditions */
+    INT_CHANGER(function_body);
+    INT_CHANGER(unparsed_code);
 
 IDENTIFIER          [A-Za-z][^[\](){} \t=\n#]*
 COMMENT             #
@@ -74,52 +85,83 @@ BASH_PONCTUATION    [[\]*<>|!&]{1,2}|==|!=
 /* exclusive start condition */
 %x comment libido function_body code unparsed_code string
 %%
+	    /* helpers, will change start condition from bison with ENTER(sc) */
+	    CHANGE_IF(function_body);
+	    CHANGE_IF(unparsed_code);
 
 <comment>libido:        BEGIN(libido); RET(LIBIDO);
-<comment>\n             BEGIN(0); RETNL;
-<comment>.              /* skip */;
+<comment>\n             BEGIN(0); COLLECT();
+<comment>.              /* skip */ buffer_add(current_line, yytext);
 
 <libido>depend          RET(DEPEND);
 <libido>verbatim        RET(VERBATIM);
 <libido>{IDENTIFIER}    RET(IDENTIFIER);
-<libido>\n              BEGIN(0); RETNL;
-<libido>[[:blank:]]+    ;
+<libido>\n              BEGIN(0); COLLECT();
+<libido>[[:blank:]]+    /* skip */ buffer_add(current_line, yytext);
 <libido>.               RETC("<l", yytext[0]);
 
 <code>{COMMENT}.*       RET(COMMENT_LINE);
 <code>.*                RET(CODE);
-<code>\n                BEGIN(0); RETNL;
+<code>\n                BEGIN(0); COLLECT();
 
-<string>\\\"        buffer_add(&collected, yytext);
-<string>[^"]+       buffer_add(&collected, yytext);
-<string>\"          buffer_add(&collected, yytext); BEGIN(0); RETB(STRING);
+    /* WARNING ! specilat start condition can be reached only from the parser */
+<function_body>{INDENT}         BEGIN(code); RET(INDENT);
+<function_body>{COMMENT}[^\n]+  RET(COMMENT_LINE);
+<function_body>\n               COLLECT();
+<function_body>\}               BEGIN(0); buffer_add(current_line, yytext); return '}';
 
+    /* to leave unparsed_code, the lexer must, match a "libido:" in a comment */
+<unparsed_code>{COMMENT}[ \t]*libido:   BEGIN(libido); RET(LIBIDO);
+<unparsed_code>.                        buffer_add(current_line, yytext);
+<unparsed_code>\n                       COLLECT(); RET(UNPARSED);
+
+    /* normal start conditions */
 {INDENT}                BEGIN(code); RET(INDENT);
 {COMMENT}               BEGIN(comment); RET(COMMENT);
 {IDENTIFIER}            if(is_keyword(yytext)) { RET(BASH_KEYWORD); } else { RET(IDENTIFIER); }
-{BASH_VAR}              RET(BASH_VAR);
-{NUMBER}                RET(NUMBER);
-\"                      collected.size = 0; buffer_add(&collected, yytext); BEGIN(string);
-'[^']+'                 RET(STRING);
-{BASH_PONCTUATION}      RET(BASH_PONCTUATION);
-{BASH_TEST}             RET(BASH_PONCTUATION);
-[ \t]+                  ;
-\n                      ; RETNL;
+[ \t]+                  /* eat spaces */ buffer_add(current_line, yytext);
+\n                      COLLECT();
 .                       RETC("<c", yytext[0]);
 
 %%
+
+void initilize_lexer() {
+    lines.list = NULL;
+
+    /* initialize a table with bash recognized keywors See bash_keywords.c */
+    init_bash_keywords();
+
+    /* for collecting lines 
+     * BUF_SIZE is defined in collected_lines.h
+     */
+    current_line = StringBuf_create(BUF_SIZE);
+}
 
 /* only useful for unitesting */
 #ifdef TEST_LEXER
 int main(int argc, char **argv) {
     int val;
+    GSList *p;
 
-    init_bash_keywords();
+    initilize_lexer();
+
     /* test routine, will eat all token and print them to stdout,
-     * via RET() preprocessor macro
+     * via RET() preprocessor macros See lexer prologue.
      */
     while( val = yylex() )
         ;
+    
+    /* permit to do 
+     * ./lexer < ../examples/libido/shell_lib.bash | sed -n '/^LEXER_END/,$ {/LEXER_END/ d; p}' \
+     *  | diff - ../examples/libido/shell_lib.bash
+     */
+    printf("LEXER_END\n");
+
+    p = lines.list;
+    while(p) {
+        printf("%s\n", ((StringBuf *)p->data)->str);
+        p = p->next;
+    }
 
     return 0;
 }

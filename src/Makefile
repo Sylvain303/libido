@@ -4,7 +4,7 @@ CC=gcc ${CFLAGS}
 all: bash_parser
 
 bash_parser: lex.yy.o bash_parser.tab.c bash_keywords.o
-	${CC} -o bash_parser bash_parser.tab.c lex.yy.o -lfl bash_keywords.o
+	${CC} -o bash_parser bash_parser.tab.c lex.yy.o -lfl bash_keywords.o $$(pkg-config --libs glib-2.0)
 
 # -d generate tab.h for inclusion in lexer.l
 # -g graph
@@ -21,10 +21,10 @@ libido: lex.yy.c functions.o functions.h
 # build only the lexer, used by unittest too
 # for debuging -DDEBUG=1 too
 lexer: lex.yy.c bash_parser.tab.h bash_keywords.o
-	${CC} -o lexer lex.yy.c -D TEST_LEXER=1 -lfl bash_keywords.o
+	${CC} -o lexer lex.yy.c -D TEST_LEXER=1 -lfl $$(pkg-config --libs --cflags glib-2.0) bash_keywords.o
 
 lex.yy.o: lex.yy.c bash_parser.tab.h bash_keywords.h bash_keywords.c
-	${CC} -DDEBUG=1 -c lex.yy.c
+	${CC} -DDEBUG=1 -c lex.yy.c $$(pkg-config --cflags glib-2.0)
 
 lex.yy.c: lexer.l
 	flex lexer.l

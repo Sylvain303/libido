@@ -1,23 +1,44 @@
 #include <assert.h>
-#include <stdio.h>
 #include <string.h>
+#include <stdlib.h>
 
-#define MAX_BUF 1024*16
-
-
-typedef struct string_buffered {
-    int size;
-    char str[MAX_BUF];
-} StringBuf;
-
+#include "buf_string.h"
 
 int buffer_add(StringBuf *buf, char *collected) {
     int new_size = strlen(collected);
-    assert((buf->size + new_size +1) <= MAX_BUF);
+
+    /* DONT Resize just hope that it has enough memory */
+    assert((buf->size + new_size +1) <= buf->max_buf_size);
+
     strncpy(&buf->str[buf->size], collected, new_size);
     buf->size += new_size;
     
     return buf->size;
+}
+
+/* optimized collecte for single char */
+int buffer_addc(StringBuf *buf, char collected_c) {
+    /* DONT Resize just hope that it has enough memory */
+    assert((buf->size + 1) <= buf->max_buf_size);
+
+    buf->str[buf->size] = collected_c;
+    buf->str[buf->size + 1] = '\0';
+    return ++buf->size;
+}
+
+StringBuf *StringBuf_create(int size) {
+    StringBuf *p;
+    p = (StringBuf * ) malloc(sizeof(StringBuf));
+    p->size = 0;
+    p->max_buf_size = size;
+    p->str = (char *) malloc(sizeof(char) * size);
+
+    return p;
+}
+
+void StringBuf_destroy(StringBuf *p) {
+    free(p->str);
+    free(p);
 }
 
 #ifdef DEBUG_BUF_STRING
