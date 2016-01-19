@@ -10,14 +10,11 @@
 
 #define BUF_SIZE 1024
 
-typedef struct _collected_lines_t {
-    GSList *list;
-} CollectedLines;
 /* add_new_line() : add a StringBuf to the list, return a new empty line
  */
-StringBuf *add_new_line(CollectedLines *list, StringBuf *buf) {
+StringBuf *add_new_line(GSList **list, StringBuf *buf) {
     StringBuf *new_buf;
-    list->list = g_slist_append(list->list, buf);
+    *list = g_slist_append(*list, buf);
     new_buf = StringBuf_create(BUF_SIZE);
     return new_buf;
 }

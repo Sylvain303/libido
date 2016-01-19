@@ -14,9 +14,17 @@ init() {
     cd - > /dev/null
 }
 
+init
+
 # tests
 
 @test "test lexer token" {
-    init
-    timeout 1 $lexer < ../examples/libido/shell_lib.bash | diff -u bash_parsed.token -
+    src=input/shell_lib.bash
+    timeout 1 $lexer < $src | diff -u bash_parsed.token -
+}
+
+@test "test lexer colleccollect" {
+    src=input/shell_lib.bash
+    timeout 1 $lexer --collected < $src | sed -n '/^LEXER_END/,$ {/LEXER_END/ d; p}' \
+     | diff - $src
 }

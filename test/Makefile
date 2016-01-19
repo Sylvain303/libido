@@ -2,6 +2,7 @@ LEXER=../src/lexer
 BATS=./bats/bin/bats
 
 check:
+	./run_test.sh
 	$(BATS) lexer.bats
 
 gen-token: $(LEXER)

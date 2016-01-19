@@ -27,8 +27,8 @@ void p(char *what, char *val)
 #endif
 
 /* Collecting lines */
-#define COLLECT()   current_line = add_new_line(&lines, current_line)
-#define ADD(str)    buffer_add(current_line, str)
+#define COLLECT()   lexer_current_line = add_new_line(&lines, lexer_current_line)
+#define ADD(str)    buffer_add(lexer_current_line, str)
 
 #ifdef DEBUG
 #  define DEBUG_p(fmt, val) p(fmt, val);
@@ -65,8 +65,8 @@ void p(char *what, char *val)
 %}
 
     /* variable definition */
-    StringBuf *current_line;
-    CollectedLines lines;
+    StringBuf *lexer_current_line;
+    GSList *lines;
 
     /* declare intger boolean changer for strat conditions */
     INT_CHANGER(function_body);
@@ -91,13 +91,13 @@ BASH_PONCTUATION    [[\]*<>|!&]{1,2}|==|!=
 
 <comment>libido:        BEGIN(libido); RET(LIBIDO);
 <comment>\n             BEGIN(0); COLLECT();
-<comment>.              /* skip */ buffer_add(current_line, yytext);
+<comment>.              /* skip */ buffer_add(lexer_current_line, yytext);
 
 <libido>depend          RET(DEPEND);
 <libido>verbatim        RET(VERBATIM);
 <libido>{IDENTIFIER}    RET(IDENTIFIER);
 <libido>\n              BEGIN(0); COLLECT();
-<libido>[[:blank:]]+    /* skip */ buffer_add(current_line, yytext);
+<libido>[[:blank:]]+    /* skip */ buffer_add(lexer_current_line, yytext);
 <libido>.               RETC("<l", yytext[0]);
 
 <code>{COMMENT}.*       RET(COMMENT_LINE);
@@ -108,25 +108,25 @@ BASH_PONCTUATION    [[\]*<>|!&]{1,2}|==|!=
 <function_body>{INDENT}         BEGIN(code); RET(INDENT);
 <function_body>{COMMENT}[^\n]+  RET(COMMENT_LINE);
 <function_body>\n               COLLECT();
-<function_body>\}               BEGIN(0); buffer_add(current_line, yytext); return '}';
+<function_body>\}               BEGIN(0); buffer_add(lexer_current_line, yytext); return '}';
 
     /* to leave unparsed_code, the lexer must, match a "libido:" in a comment */
 <unparsed_code>{COMMENT}[ \t]*libido:   BEGIN(libido); RET(LIBIDO);
-<unparsed_code>.                        buffer_add(current_line, yytext);
+<unparsed_code>.                        buffer_add(lexer_current_line, yytext);
 <unparsed_code>\n                       COLLECT(); RET(UNPARSED);
 
     /* normal start conditions */
 {INDENT}                BEGIN(code); RET(INDENT);
 {COMMENT}               BEGIN(comment); RET(COMMENT);
 {IDENTIFIER}            if(is_keyword(yytext)) { RET(BASH_KEYWORD); } else { RET(IDENTIFIER); }
-[ \t]+                  /* eat spaces */ buffer_add(current_line, yytext);
+[ \t]+                  /* eat spaces */ buffer_add(lexer_current_line, yytext);
 \n                      COLLECT();
 .                       RETC("<c", yytext[0]);
 
 %%
 
 void initilize_lexer() {
-    lines.list = NULL;
+    lines = NULL;
 
     /* initialize a table with bash recognized keywors See bash_keywords.c */
     init_bash_keywords();
@@ -134,7 +134,7 @@ void initilize_lexer() {
     /* for collecting lines 
      * BUF_SIZE is defined in collected_lines.h
      */
-    current_line = StringBuf_create(BUF_SIZE);
+    lexer_current_line = StringBuf_create(BUF_SIZE);
 }
 
 /* only useful for unitesting */
@@ -145,22 +145,32 @@ int main(int argc, char **argv) {
 
     initilize_lexer();
 
+    if(argc >= 2 && strcmp(argv[1], "function_body") == 0) {
+        function_body_change = 1;
+    }
+
+    if(argc >= 2 && strcmp(argv[1], "unparsed_code") == 0) {
+        unparsed_code_change = 1;
+    }
+
     /* test routine, will eat all token and print them to stdout,
      * via RET() preprocessor macros See lexer prologue.
      */
     while( val = yylex() )
         ;
     
-    /* permit to do 
-     * ./lexer < ../examples/libido/shell_lib.bash | sed -n '/^LEXER_END/,$ {/LEXER_END/ d; p}' \
-     *  | diff - ../examples/libido/shell_lib.bash
-     */
-    printf("LEXER_END\n");
-
-    p = lines.list;
-    while(p) {
-        printf("%s\n", ((StringBuf *)p->data)->str);
-        p = p->next;
+    /* collector collect all the source for now */
+    if(argc >= 2 && strcmp(argv[1], "--collected") == 0) {
+        /* permit to do 
+         * ./lexer < ../examples/libido/shell_lib.bash | sed -n '/^LEXER_END/,$ {/LEXER_END/ d; p}' \
+         *  | diff - ../examples/libido/shell_lib.bash
+         */
+        printf("LEXER_END\n");
+        p = lines;
+        while(p) {
+            printf("%s\n", ((StringBuf *)p->data)->str);
+            p = p->next;
+        }
     }
 
     return 0;

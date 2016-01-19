@@ -1,6 +1,20 @@
-%{
+%code top {
 #include <stdio.h>
+}
 
+%code requires {
+#include "function_lines.h"
+typedef int dummy_list;
+}
+
+
+%union {
+    char *str;
+    function_lines *range;
+    dummy_list *list;
+}
+
+%{
 /* from lexer.l */
 extern FILE * yyin;
 extern int yylineno;
@@ -13,15 +27,28 @@ int yylex(void);
 void yyerror(char const *);
 
 /* dummy */
-int make_list(int e1, int e2) { return 2; }
+dummy_list *make_list(char *e1, char *e2) { return NULL; }
+int store_func_table(char *identifier, function_lines *range) { return 0xCACA; }
 
 #define YYDEBUG 1
 /* change a global var to modify lexer start condition */
 #define ENTER(lexer_sc) lexer_sc ## _change = 1
+
+/* globals */
+GSList *function_start, *verbatim_start, *current_line;
 %}
 
+
 %token BASH_KEYWORD BASH_PONCTUATION BASH_STRING BASH_VAR CODE COMMENT COMMENT_LINE 
-%token DEPEND FUNCTION IDENTIFIER INDENT LIBIDO NUMBER STRING UNPARSED VERBATIM 
+%token DEPEND FUNCTION INDENT LIBIDO NUMBER STRING UNPARSED VERBATIM 
+
+/* assign type from %union to terminal and non-terminal symbols */
+%token <str>    IDENTIFIER
+%type  <str>    entity
+%type  <range>  function_body
+%type  <range>  verbatim_chunk
+%type  <list>   entities
+
 
 /* trick to extract %token: r!grep -o '[A-Z_]\{2,\}' < % | sort -u */
 
@@ -62,15 +89,15 @@ libido_statment:
   ;
 
 function_def:
-    FUNCTION IDENTIFIER '(' ')' function_body
-  | FUNCTION IDENTIFIER function_body
-  | IDENTIFIER '(' ')' function_body
+    FUNCTION IDENTIFIER '(' ')' function_body   { store_func_table($IDENTIFIER, $function_body); }
+  | FUNCTION IDENTIFIER function_body           { store_func_table($IDENTIFIER, $function_body); }
+  | IDENTIFIER '(' ')' function_body            { store_func_table($IDENTIFIER, $function_body); }
   ;
 
 function_body:
-  '{'                              { ENTER(function_body); }
+  '{'                              { ENTER(function_body); function_start = current_line; }
      lines_of_indented_code
-  '}'
+  '}'                              { $function_body = assign_collected(function_start, current_line); }
   ;
 
 lines_of_indented_code:
@@ -85,9 +112,9 @@ indented_code:
   ;
 
 verbatim_chunk:
-  VERBATIM '(' IDENTIFIER ')' '{'   { ENTER(unparsed_code); }
+  VERBATIM '(' IDENTIFIER ')' '{'   { ENTER(unparsed_code); verbatim_start = current_line; }
     unparsed_lines
-  LIBIDO '}'
+  LIBIDO '}'                        { $verbatim_chunk = assign_collected(verbatim_start, current_line); }
   ;
 
 unparsed_lines:
@@ -100,7 +127,7 @@ libido_dependency:
   ;
 
 entities:
-    entity
+    entity                             { $entities = make_list($entity, NULL); } 
   | entity[left] ',' entity[right]     { $entities = make_list($left, $right); }
   ;
 
@@ -116,6 +143,8 @@ int main(int argc, char **argv) {
     int filepos = 1;
 
     initilize_lexer();
+    /* TODO: current_line was in confict with lexer, change to something else */
+    current_line = function_start = verbatim_start = NULL;
 
     /* switch to debug mode */
     if(strcmp(argv[1], "-d") == 0) {

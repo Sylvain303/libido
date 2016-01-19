@@ -3,8 +3,9 @@ CC=gcc ${CFLAGS}
 
 all: bash_parser
 
-bash_parser: lex.yy.o bash_parser.tab.c bash_keywords.o
-	${CC} -o bash_parser bash_parser.tab.c lex.yy.o -lfl bash_keywords.o $$(pkg-config --libs glib-2.0)
+OBJECTS=lex.yy.o bash_keywords.o function_lines.o
+bash_parser: bash_parser.tab.c $(OBJECTS)
+	${CC} -o bash_parser bash_parser.tab.c $(OBJECTS) -lfl $$(pkg-config --cflags --libs glib-2.0)
 
 # -d generate tab.h for inclusion in lexer.l
 # -g graph
@@ -31,6 +32,9 @@ lex.yy.c: lexer.l
 
 bash_keywords.o: bash_keywords.c bash_keywords.h
 	${CC} -c bash_keywords.c
+
+function_lines.o: function_lines.c function_lines.h
+	${CC} -c function_lines.c $$(pkg-config --cflags glib-2.0)
 
 # experimentation maybe not commited code
 calc: calc.tab.c
