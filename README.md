@@ -18,6 +18,15 @@ Old school programming. OK may be. But lightning fast!
 * GNU flex and bison for lexical analyser and grammar parser
 * GNU make and gcc
 
+### other derivative languages
+
+Yes some other programming languages are also used.
+
+* python
+* ruby
+* bash
+* C++
+
 ## Current status
 
 Draft and prototype.
@@ -109,6 +118,10 @@ exporting is a way of collecting fresh crafted piece of code into your lib.
 * [cpp](http://gcc.gnu.org/onlinedocs/cpp/) - C preprocessor
 * [sed](https://www.gnu.org/software/sed/manual/sed.html) - stream editor
 * [gpp](http://en.nothingisreal.com/wiki/GPP) - general-purpose preprocessor
+
+### template
+
+* [mustache](https://mustache.github.io/mustache.5.html) - Templating JSON and preprocessor
 
 ## snipMate
 Having snippet autocompletable in code
