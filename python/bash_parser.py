@@ -4,6 +4,9 @@
 #
 # libido - python prototype
 #
+# ouput - Comment / matched function and verbatim blocks / lines of code matched
+# can be filtered with: | grep '^[^ #]'
+# Usage: python bash_parser.py ../examples/libido/shell_lib.bash | grep '^[^# ]'
 
 import sys
 import re
@@ -96,9 +99,8 @@ def main():
   p = Bash_parser()
   d = p.parse(filename)
 
-  # output
-  
-  out = "%s " % ( os.path.basename(filename) )
+  # output stats
+  out = "# %s " % ( os.path.basename(filename) )
   no_print = []
   out += '('
   for stat in d:
@@ -110,6 +112,7 @@ def main():
 
   print out
 
+  # print all matched chunks of code
   p.print_chunks()
 
 
