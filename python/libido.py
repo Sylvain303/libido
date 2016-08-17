@@ -1,6 +1,6 @@
 #!/usr/bin/python -tt
 # -*- coding: utf-8 -*-
-# vim: set et ts=2 sw=2 sts=2:
+# vim: set et ts=4 sw=4 sts=4:
 #
 # libido - python prototype
 # 
@@ -19,7 +19,7 @@ import sys
 import re
 import os
 
-import bash_parser
+import parser_factory
 
 def usage():
     # with sed: [[ "$1" == "--help" ]] && { sed -n -e '/^# Usage:/,/^$/ s/^# \?//p' < $0; exit; }
@@ -77,15 +77,12 @@ def readconfig(fname):
         else:
             print('config:error:%d:no match: %s' % (i,l))
 
-def detect(filename):
-    return 'bash'
-
 def main():
     # verify script number of arguments
     nargv = len(sys.argv)
     if nargv <= 1:
-      usage()
-      sys.exit(1)
+        usage()
+        sys.exit(1)
       
     # process agrument
     filename = sys.argv[1]
@@ -99,40 +96,39 @@ def main():
         conf = readconfig(config)
 
     print('filename=%s' % filename)
-    file_type = detect(filename)
+    factory = parser_factory.parser_factory(config)
 
-    parsers = { 'bash' : bash_parser.Bash_parser }
-    parser = parsers.get(file_type)
+    parser = factory.get_parser(filename)
     if not parser:
         print("no parser found for '%s' type: %s" % (filename, file_type))
-        sys.exit(0)
+        sys.exit(1)
 
-    p = parser()
-    d = p.parse(filename)
+    d = parser.parse(filename)
 
     # output stats
     out = "# %s " % ( os.path.basename(filename) )
     no_print = []
     out += '('
     for stat in d:
-      if stat in no_print:
-        continue
-      # trunk 2 chars stat[0:2]
-      out += "%s : %d, " % (stat, d[stat])
+        if stat in no_print:
+           continue
+        # or trunk to 2 chars with stat[0:2]
+        out += "%s : %d, " % (stat, d[stat])
+
     out = re.sub(r', $', ')', out)
 
-    # display functions found
+    # display all functions found
     if d['function'] > 0:
         # list all
-        out += "\n%s" % ' '.join(p.chunks.keys())
+        out += "\n%s" % ' '.join(parser.chunks.keys())
         # output + start
-        for f in p.chunks.keys():
-            out += "\n%s:%d" % (f, p.chunks[f]['start'])
+        for f in parser.chunks.keys():
+            out += "\n%s:%d" % (f, parser.chunks[f]['start'])
+        # print all matched chunks of code
+        parser.print_chunks()
 
     print out
 
-    # print all matched chunks of code
-    #p.print_chunks()
 
 if __name__ == '__main__':
     main()

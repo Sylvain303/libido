@@ -12,7 +12,7 @@
 from __future__ import print_function
 import sys
 import re
-import os
+import glob
 from collections import namedtuple
 
 # local lib
@@ -23,13 +23,14 @@ re.UNICODE
 re.LOCALE
 
 class libido_parser():
-    def __init__(self, config, open_marker = 'libido:'):
+    def __init__(self, config, parser_factory):
         self.config = config
-        self.open_marker = config.get('open_marker', open_marker)
+        self.open_marker = config.get('open_marker', 'libido:')
         self.token_map = {}
         self.named_chunk = []
         self.expand_memo = {}
         self.lines = []
+        self.parser_factory = parser_factory
 
     def tokenize(self, m):
         if m.match(r'([a-zA-Z_][a-zA-Z0-9_]*)\s*=\s*([a-z_]+)\(([^)]+)\)'):
@@ -69,9 +70,14 @@ class libido_parser():
 
     def load_lib(self):
         config_location = self.config.get('lib_source')
-        for l in config_location:
-            # open l as file or dir
+        for f in glob.glob(config_location):
+            file_type = self.parser_factory.detect(f)
+            print("loction=%s, type=%s" % (f, file_type))
+
         return None
+
+    def apply_chunk(self, chunk_of_code):
+        pass
 
     def parse(self, filename):
         #open file in reading mode unicode
@@ -114,8 +120,9 @@ class libido_parser():
     def dump_result(self):
         for tok in self.named_chunk:
             chunk = self.find_chunk(tok)
-            if chunk:
-                pass
+            if not chunk:
+                raise RuntimeError("named_chunk not found: %s" % tok)
+            self.apply_chunk(chunk)
 
         for l in self.lines:
             print(l, end='')
