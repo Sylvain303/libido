@@ -1,3 +1,15 @@
+#
+# small regexp matcher for simplier syntax
+# for parser when you do extensive matching and extracting pattern
+#
+# Usage:
+#
+# from rematcher import REMatcher
+# l = 'some string'
+# m = REMatcher(l)
+# if m.match(r'(some)'):
+#     part = m.group(1)
+#
 import re
 import os
 
@@ -13,3 +25,6 @@ class REMatcher(object):
 
     def group(self,i):
         return self.rematch.group(i)
+
+    def all(self):
+        return self.rematch.groups()
