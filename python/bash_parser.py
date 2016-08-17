@@ -75,9 +75,9 @@ class Bash_parser():
         self.d['comments'] += 1
       elif m.match(r'^\s*$'):
         self.d['empty'] += 1
-      elif m.match(r'([a-zA-Z][a-zA-Z0-9_]*)\s*\(\)'):
+      elif m.match(r'^(function)?\s*([a-zA-Z][a-zA-Z0-9_]*)\s*\(\)'):
         self.d['function'] += 1
-        func_name = m.group(1)
+        func_name = m.group(2)
         self.chunks[func_name] = { 'start' : n }
       elif m.match(r'^\}') and func_name:
         self.chunks[func_name]['end'] = n

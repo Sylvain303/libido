@@ -7,7 +7,8 @@ What?
 libido stand for maximizing your pleasure! => lib I do
 
 `libido` is a smart text preprocessor/editor which modifies your code inline!
-By inserting comment (or not) with `libido:` keyword you can expand/update some part of your code with your lovely crafted snippet.
+By inserting comment (or not) with `libido:` keyword you can expand/update some part of your code with your lovely
+crafted snippet.
 
 OK, a kind of super `sed`, with a nice syntax to extract, fetch, update inline chunk of code. See bellow.
 
@@ -31,12 +32,12 @@ Yes some other programming languages are also used.
 
 Draft and prototype.
 
-* some test with googleTest in test/
-* some test with bats in test/
+* some test with googleTest in `test/`
+* some test with bats in `test/`
 * parse an external source to match code token with the grammar (See [example](examples/libido/shell_lib.bash))
 * some prototype in C for buffering data
 * Makefiles OK.
-* a simplistic python bash_parser in python/
+* a simplistic python `bash_parser` in `python/`
 
 ## Unittesting
 * GoogleTest for C
@@ -53,7 +54,7 @@ File: [examples/readme_ex0.sh](examples/readme_ex0.sh)
 #
 # libido: bash_code=bash(die, docopts)
 #
-# How to Rebuild: rebuild this code with:
+# how to rebuild: rebuild this code with:
 # $ libido examples/readme_ex0.sh
 
 echo 'some code here'
@@ -71,7 +72,8 @@ exit 0
 
 The first `libido:` tag tell the preprocessor that the bash script will use a external chunk of code, here 2 functions: `die` and `docopts,` written in bash.
 
-The second occurrence, `libido: expand bash_code` will expand the parsed code in place just here. The name `bash_code` is defined previously with the affectation.
+The second occurrence, `libido: expand bash_code` will expand the parsed code in place just here. The name `bash_code`
+is defined previously with the affectation.
 
 Hey, how does libido nows where to find the snippet for die() and such?
 
@@ -79,7 +81,8 @@ In the libido.conf!
 
 ## libido.conf
 
-`libido` can use a conf file to store config globally outside the source code. `libido.conf` looks like bash variable assignment.
+`libido` can use a conf file to store config globally outside the source code. `libido.conf` looks like bash variable
+assignment.
 
 ~~~
 # some comment in libido.conf
@@ -108,12 +111,44 @@ OPTIONS:
 
 Exporting is a way of collecting fresh crafted piece of code into your lib.
 
-## Lexical analyzer with flex
+## libido syntax
+
+Note: `open_marker` is `libido:` embeded in comment
+
+`libido_statement`: 'libido:' libido_action
+
+`libido_action`:
+    VARIABLE '=' `parser_name` LIST 
+    'expand' VARIABLE
+
+`parser_name`:
+    'bash'
+
+VARIABLE: `[a-zA-Z_][a-zA-Z0-9_]*`
+LIST: '(' VARIABLE, ... ')'
+
+### example of syntax
+~~~
+# libido: bash_code=bash(die, docopts)
+~~~
+
+`bash_code` is assigned with foreign code parsed with bash. Function collected are `die` and `docopts`
+
+~~~
+# libido: expand bash_code
+~~~
+
+expands `bash_code` here. comment is kept.
+ 
+
+## Some references
+
+### Lexical analyzer with flex
 * [flex](http://flex.sourceforge.net/manual/Simple-Examples.html#Simple-Examples)
 * [bison](https://www.gnu.org/software/bison/manual/html_node/index.html#SEC_Contents)
 
 
-## Other preprocessor like program
+### Other preprocessor like program
 
 * [m4](http://www.gnu.org/software/m4/m4.html) - macro preprocessor
 * [cpp](http://gcc.gnu.org/onlinedocs/cpp/) - C preprocessor
@@ -124,7 +159,7 @@ Exporting is a way of collecting fresh crafted piece of code into your lib.
 
 * [mustache](https://mustache.github.io/mustache.5.html) - Templating JSON and preprocessor
 
-## snipMate
+### snipMate
 Having snippet auto completable in code
 * http://www.vim.org/scripts/script.php?script_id=2540 - vim snipMate
 * https://github.com/garbas/vim-snipmate
