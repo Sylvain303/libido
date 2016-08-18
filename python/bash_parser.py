@@ -1,6 +1,6 @@
 #!/usr/bin/python -tt
 # -*- coding: utf-8 -*-
-# vim: set et ts=2 sw=2 sts=2:
+# vim: set et ts=4 sw=4 sts=4:
 #
 # libido - python prototype
 #
@@ -38,6 +38,12 @@ class Bash_parser():
                 name, self.chunks[name]['start'], self.chunks[name]['end'])
             for i in xrange(self.chunks[name]['start'], self.chunks[name]['end']+1):
                 print " %3d=> %s" % (i, self.lines[i-1].rstrip('\n'))
+
+    def get_chunk(self, chunk_ref):
+        chunk_lines = []
+        for i in xrange(chunk_ref['start'], chunk_ref['end']+1):
+            chunk_lines.append(self.lines[i-1].rstrip('\n'))
+        return chunk_lines
 
     def parse(self, filename):
         #open file in reading mode unicode

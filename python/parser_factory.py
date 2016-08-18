@@ -5,6 +5,13 @@
 # libido - python prototype
 #
 # factory to detect language type and create parser
+#
+# Usage:
+#    import parser_factory
+#    conf = { 'lib_source' : 'some/path/to/your/lib' }
+#    f = parser_factory.parser_factory(conf)
+#    a_parser = f.get_parser(some_file_to_parse)
+#    a_parser.parse(some_file_to_parse)
 
 import re
 
