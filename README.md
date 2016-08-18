@@ -12,12 +12,27 @@ crafted snippet.
 
 OK, a kind of super `sed`, with a nice syntax to extract, fetch, update inline chunk of code. See bellow.
 
-## Written in C
+## Status : Prototype
 
-Old school programming. OK may be. But lightning fast!
+This project is a sandbox for idea. It cares about parsing and programming freely.
+
+Draft and prototype.
+
+* some test with googleTest in `test/`
+* some test with bats in `test/`
+* parse an external source to match code token with the grammar (See [example](examples/libido/shell_lib.bash))
+* some prototype in C for buffering data
+* Makefiles OK.
+* a python protype implementing part of the goals described here in `python/` + unittest with `py.test`
+
+## Written in C and python
+
+Old school programming. OK may be. But lightning fast! (heu, but long to code maybe…)
 
 * GNU flex and bison for lexical analyser and grammar parser
 * GNU make and gcc
+
+Actually I moved to `python/` for a *not performance* oriented prototype.
 
 ### other derivative languages
 
@@ -28,24 +43,15 @@ Yes some other programming languages are also used.
 * bash
 * C++
 
-## Current status
-
-Draft and prototype.
-
-* some test with googleTest in `test/`
-* some test with bats in `test/`
-* parse an external source to match code token with the grammar (See [example](examples/libido/shell_lib.bash))
-* some prototype in C for buffering data
-* Makefiles OK.
-* a simplistic python `bash_parser` in `python/`
 
 ## Unittesting
 * GoogleTest for C
 * bats for functional testing in bash
+* py.test for python
 
 ## Usage - Example - goals at term
 
-What will be achieved when working :
+What will be achieved when working?
 
 File: [examples/readme_ex0.sh](examples/readme_ex0.sh)
 
@@ -98,6 +104,7 @@ disable_add_ref=false
 
 ## Command line
 
+~~~
 Usage: libido [OPTIONS] SOURCE_FILE ...
 
 OPTIONS:
@@ -106,6 +113,7 @@ OPTIONS:
  -b=[suffix] backup with suffix (incremental backup)
  -r          revert?
  -e          export back marked piece of code
+~~~
 
 ### exporting
 
@@ -115,17 +123,14 @@ Exporting is a way of collecting fresh crafted piece of code into your lib.
 
 Note: `open_marker` is `libido:` embeded in comment
 
-`libido_statement`: 'libido:' libido_action
-
-`libido_action`:
-    VARIABLE '=' `parser_name` LIST 
-    'expand' VARIABLE
-
-`parser_name`:
-    'bash'
-
-VARIABLE: `[a-zA-Z_][a-zA-Z0-9_]*`
-LIST: '(' VARIABLE, ... ')'
+* `libido_statement`: 'libido:' `libido_action`
+* `libido_action`:
+ * `VARIABLE` '=' `parser_name` `LIST`
+ * 'expand' `VARIABLE`
+* `parser_name`:
+ * 'bash'
+* `VARIABLE`: `[a-zA-Z_][a-zA-Z0-9_]*`
+* `LIST`: '(' `VARIABLE`, ... ')'
 
 ### example of syntax
 ~~~
