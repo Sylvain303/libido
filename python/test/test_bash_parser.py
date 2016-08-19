@@ -14,5 +14,5 @@ def test_get_chunk():
 
     c = p.get_chunk(p.chunks['die'])
     assert isinstance(c, list)
-    assert c[0] == 'die() {'
+    assert c[0] == 'die() {\n'
 

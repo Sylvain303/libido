@@ -42,7 +42,8 @@ class Bash_parser():
     def get_chunk(self, chunk_ref):
         chunk_lines = []
         for i in xrange(chunk_ref['start'], chunk_ref['end']+1):
-            chunk_lines.append(self.lines[i-1].rstrip('\n'))
+            # keep newlines
+            chunk_lines.append(self.lines[i-1])
         return chunk_lines
 
     def parse(self, filename):

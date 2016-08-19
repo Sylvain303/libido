@@ -18,17 +18,24 @@ from collections import namedtuple
 # local lib
 sys.path.append('.')
 from rematcher import REMatcher
+from libido import printerr
 
 re.UNICODE
 re.LOCALE
 
 def flat_line(list_of_lines):
+    if isinstance(list_of_lines, str):
+        list_of_lines = [ list_of_lines ]
+
     out = ''
     for l in list_of_lines:
         if isinstance(l, list):
             out += '\n'.join(l)
         else:
-            out += l
+            if l[-1] == '\n':
+                out += l
+            else:
+                out += l + '\n'
     return out
 
 class libido_parser():
@@ -41,6 +48,7 @@ class libido_parser():
         self.lines = []
         self.parser_factory = parser_factory
         self.code_lib = {}
+        self.chunks_resolved = {}
 
     def tokenize(self, m):
         if m.match(r'([a-zA-Z_][a-zA-Z0-9_]*)\s*=\s*([a-z_]+)\(([^)]+)\)'):
@@ -73,20 +81,42 @@ class libido_parser():
 
     def find_chunk(self, named_chunk):
         self.load_lib()
+        c = self.chunks_resolved.get(named_chunk)
+        if c:
+            return c
+
+        # self.code_lib is a dict of parser associated to files found
+        # in config[lib_source]
         for f, p in self.code_lib.items():
             c = p.chunks.get(named_chunk)
             if c:
                 # return a list of line
-                return p.get_chunk(c)
+                self.chunks_resolved[named_chunk] = p.get_chunk(c)
+                return self.chunks_resolved[named_chunk]
         return None
 
-    def load_lib(self):
+    def load_lib(self, force=False):
+        """
+        load_lib() 
+
+            self.code_lib dict will contain a list of parser instancied to source code file 
+            found in the 'lib_source' config parameter
+
+            return int, number of entries in self.code_lib or -1 if not re-run
+        """
+        # if not forced run only once
+        if not force and len(self.code_lib) > 0:
+            return -1
+
         config_location = self.config.get('lib_source')
+        if not config_location:
+            raise RuntimeError("load_lib(): config_location not found no lib available")
+
         self.code_lib = {}
         n = 0
         for f in glob.glob(config_location):
             parser = self.parser_factory.get_parser(f)
-            print("loction=%s, type=%s" % (f, parser.name))
+            printerr("location=%s, type=%s" % (f, parser.name))
             parser.parse(f)
             self.code_lib[f] = parser
             n += 1
@@ -95,9 +125,11 @@ class libido_parser():
 
     def apply_chunk(self, named_chunk, chunk_of_code):
         where = self.expand_memo.get(named_chunk)
+        # duplicate lines
+        self.output = self.lines[:]
         for n in where:
-            old_l = self.lines[n-1]
-            self.lines[n-1] = [old_l, chunk_of_code ]
+            old_l = self.output[n-1]
+            self.output[n-1] = [old_l, chunk_of_code ]
 
     def parse(self, filename):
         #open file in reading mode unicode
@@ -130,19 +162,33 @@ class libido_parser():
                     elif p.action == 'expand':
                         self.add_expansion(n, p.expand_arg)
                 else:
-                    print('error:%d:%s' % (n, line.rstrip()))
+                    printerr('parsre error:%d:%s' % (n, line.rstrip()))
 
         f.close()
-
         return self.d
 
+    def resolve_assignement(self):
+        self.chunks_resolved = {}
+        for var, info in self.token_map.items():
+            self.chunks_resolved[var] = []
+            for tok in info['val']:
+                chunk_lines = self.find_chunk(tok)
+                if chunk_lines:
+                    self.chunks_resolved[var].append(flat_line(chunk_lines))
+                else:
+                    self.chunks_resolved[var].append('# missing: %s' % tok)
 
     def dump_result(self):
-        for tok in self.named_chunk:
+        self.resolve_assignement()
+
+        for tok, places in self.expand_memo.items():
             chunk_lines = self.find_chunk(tok)
             if not chunk_lines:
                 raise RuntimeError("named_chunk not found: %s" % tok)
-            self.apply_chunk(named_chunk, chunk_lines)
+            self.apply_chunk(tok, chunk_lines)
 
-        for l in self.lines:
-            print(flat_line(l), end='')
+        out = ''
+        for l in self.output:
+            out += flat_line(l)
+
+        return out

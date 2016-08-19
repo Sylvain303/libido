@@ -4,7 +4,7 @@
 #
 # libido - python prototype
 # 
-# example: python libido.py ../examples/libido/shell_lib.bash
+# example: python libido.py ../examples/readme_ex0.sh
 #
 # Usage: libido [OPTIONS] SOURCE_FILE ...
 #
@@ -14,12 +14,17 @@
 #  -b=[suffix] backup with suffix (incremental backup)
 #  -r          revert?
 #  -e          export back marked piece of code
+from __future__ import print_function
 
 import sys
 import re
 import os
 
 import parser_factory
+import libido_parser
+
+def printerr(*args, **kwargs):
+    print(*args, file=sys.stderr, **kwargs)
 
 def usage():
     # with sed: [[ "$1" == "--help" ]] && { sed -n -e '/^# Usage:/,/^$/ s/^# \?//p' < $0; exit; }
@@ -53,6 +58,7 @@ def readconfig(fname):
         auto_inc_duplicate
         auto_quote_string
         disable_add_ref
+        lib_source
     """
     allowed = [ k.strip() for k in keywords.strip().split('\n') if len(k) > 1 ]
 
@@ -68,14 +74,16 @@ def readconfig(fname):
         try:
             var, val = re.split(r'\s*=\s*', l)
         except ValueError:
-            print("config:error:%d:split on:'%s'" % (i, l))
+            printerr("config:error:%d:split on:'%s'" % (i, l))
             continue
 
         if var:
-            print('config(%d):%s : %s' % (i, var, val))
+            printerr('config(%d):%s : %s' % (i, var, val))
             config[var] = val
         else:
-            print('config:error:%d:no match: %s' % (i,l))
+            printerr('config:error:%d:no match: %s' % (i,l))
+
+    return config
 
 def main():
     # verify script number of arguments
@@ -89,19 +97,26 @@ def main():
 
     # process config
     config_base = 'libido.conf'
+    conf = None
 
-    config = config_base
-    conf = {}
-    if os.path.isfile(config):
-        conf = readconfig(config)
+    mydir = os.path.dirname(os.path.realpath(__file__))
+    look_for_config = [ '.', '.libido', '~/.libido', mydir ]
+    for d in look_for_config:
+        config_file = os.path.join(os.path.expanduser(d), config_base)
+        if os.path.isfile(config_file):
+            printerr('readconfig=%s' % config_file)
+            conf = readconfig(config_file)
+            break
 
-    print('filename=%s' % filename)
-    factory = parser_factory.parser_factory(config)
+    if conf == None:
+        raise RuntimeError("no config found")
+
+    printerr('filename=%s' % filename)
+    factory = parser_factory.parser_factory(conf)
 
     parser = factory.get_parser(filename)
     if not parser:
-        print("no parser found for '%s' type: %s" % (filename, file_type))
-        sys.exit(1)
+        raise RuntimeError("no parser found for '%s' type: %s" % (filename, file_type))
 
     d = parser.parse(filename)
 
@@ -127,7 +142,12 @@ def main():
         # print all matched chunks of code
         parser.print_chunks()
 
-    print out
+    printerr(out)
+
+    lparser = libido_parser.libido_parser(conf, factory)
+    lparser.parse(filename)
+    # no extra newline
+    print(lparser.dump_result(), end='')
 
 
 if __name__ == '__main__':

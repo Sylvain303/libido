@@ -4,6 +4,7 @@ sys.path.append('..')
 
 import libido_parser
 import parser_factory
+import pytest
 
 
 
@@ -12,16 +13,25 @@ def _find_examples():
     assert os.path.isdir(path)
     return path + '/*'
 
-def _create_factory():
-    conf = {'lib_source' : _find_examples()}
+def _create_factory(conf = None):
+    if conf == None:
+        conf = {'lib_source' : _find_examples()}
     f = parser_factory.parser_factory(conf)
     return f
 
-def test_load_lib():
-    conf = {'lib_source' : _find_examples()}
-    f = _create_factory()
-    p = libido_parser.libido_parser(conf, parser_factory=f)
+def _create_parser(conf = None):
+    if conf == None:
+        conf = {'lib_source' : _find_examples()}
+    f = _create_factory(conf)
+    return libido_parser.libido_parser(conf, parser_factory=f)
 
+def test_load_lib():
+    p = _create_parser(conf={})
+    # raise if no config_location found
+    with pytest.raises(RuntimeError):
+        p.load_lib()
+
+    p = _create_parser()
     r = p.load_lib()
     assert len(p.code_lib) > 0
 
@@ -34,5 +44,36 @@ def test_find_chunk():
     assert isinstance(c, list)
     for l in c:
         assert isinstance(l, str)
+        assert l[-1] == '\n'
 
+def test_resolve_assignement():
+    p = _create_parser()
+    p.parse('../../examples/readme_ex0.sh')
+    p.resolve_assignement()
+
+    assert len(p.chunks_resolved) > 0
+    assert len(p.chunks_resolved['bash_code']) > 1
+
+    p.resolve_assignement()
+    assert len(p.chunks_resolved['bash_code']) > 1
+
+
+def test_dump_result():
+    p = _create_parser()
+    p.parse('../../examples/readme_ex0.sh')
+    out = p.dump_result()
+    assert isinstance(out, str)
+
+    # ensure no extra newline
+    assert out[-1] == '\n'
+    assert p.output[-1] == p.lines[-1]
+
+    # can be run twice 
+    out2 = p.dump_result()
+    assert out == out2
+
+def test_flat_line():
+    v = 'some text'
+    r = libido_parser.flat_line(v)
+    assert r == 'some text\n'
 
