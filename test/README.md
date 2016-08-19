@@ -8,4 +8,9 @@
 
 ## run tests
 
+~~~
+cd python/
+bats all.bats
+~~~
+
 ## other tests
