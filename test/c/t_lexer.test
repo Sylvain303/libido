@@ -1,0 +1,11 @@
+# test grammar for bash parsing
+create input.bash
+create expect_bash.parsed
+bash_parser input.bash > result_bash.parsed
+compare expect_bash.parsed result_bash.parsed
+
+# granular testing
+
+## test case
+
+## error matching
