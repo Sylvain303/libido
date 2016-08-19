@@ -18,7 +18,7 @@ from collections import namedtuple
 # local lib
 sys.path.append('.')
 from rematcher import REMatcher
-from libido import printerr
+from helper import printerr
 
 re.UNICODE
 re.LOCALE

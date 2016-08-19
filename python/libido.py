@@ -22,9 +22,7 @@ import os
 
 import parser_factory
 import libido_parser
-
-def printerr(*args, **kwargs):
-    print(*args, file=sys.stderr, **kwargs)
+from helper import printerr
 
 def usage():
     # with sed: [[ "$1" == "--help" ]] && { sed -n -e '/^# Usage:/,/^$/ s/^# \?//p' < $0; exit; }
