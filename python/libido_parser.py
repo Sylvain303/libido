@@ -4,10 +4,8 @@
 #
 # libido - python prototype
 #
-# parser for libido embeded syntax:
+# parser for libido embeded syntax, it uses subparser and parser_factory
 #
-# libido: bash_code=bash(die, docopts)
-# libido: expand bash_code
 
 from __future__ import print_function
 import sys
@@ -41,7 +39,8 @@ def flat_line(list_of_lines):
 class libido_parser():
     def __init__(self, config, parser_factory):
         self.config = config
-        self.open_marker = config.get('open_marker', 'libido:')
+        # avoid libido open_marker match in this code itself
+        self.open_marker = config.get('open_marker', 'libido' + ':')
         self.token_map = {}
         self.named_chunk = []
         self.expand_memo = {}
@@ -51,17 +50,47 @@ class libido_parser():
         self.chunks_resolved = {}
 
     def tokenize(self, m):
-        if m.match(r'([a-zA-Z_][a-zA-Z0-9_]*)\s*=\s*([a-z_]+)\(([^)]+)\)'):
+        """
+        tokenize() : divide a libido line into recognized token
+
+        token are variable:
+            # libido# bash_code=bash(die, some_func)
+            -> { action: assign, var: bash_code, parser: bash, args: [die, some_func] }
+            # libido# expand bash_code
+            -> { action: expand, args: bash_code }
+        """
+        if m.match(r'([a-zA-Z_][a-zA-Z0-9_]*)\s*=\s*([a-z_]+)\s*\(([^)]+)\)'):
+            libido_token = namedtuple('libido_token', 'action var parser args')
             var = m.group(1)
             parser = m.group(2)
             args = [a.strip() for a in m.group(3).split(',')]
-            libido_token = namedtuple('libido_token', 'action var parser args')
             return libido_token('assign', var, parser, args) 
 
         if m.match(r'expand\s+([a-zA-Z_][a-zA-Z0-9_]*)'):
-            expand_arg = m.group(1)
-            libido_token = namedtuple('libido_token', 'action expand_arg')
-            return libido_token('expand', expand_arg) 
+            libido_token = namedtuple('libido_token', 'action args')
+            args = m.group(1)
+            # single arg
+            return libido_token('expand', args) 
+
+        if m.match(r'depend\s*\(([^)]+)\)'):
+            libido_token = namedtuple('libido_token', 'action args')
+            dependencies = [a.strip() for a in m.group(1).split(',')]
+            return libido_token('depend', dependencies) 
+
+        # example: libido# verbatim(bash_main) {
+        if m.match(r'verbatim\s*\(([^)]+)\)\s*\{'):
+            libido_token = namedtuple('libido_token', 'action args open close')
+            verbatim = m.group(1)
+            match_end = r'\s*\}'
+            return libido_token('verbatim', verbatim, True, False) 
+
+        # example: libido# }
+        if m.match(r'\s*\}\s*$'):
+            libido_token = namedtuple('libido_token', 'action args open close')
+            return libido_token('verbatim', None, False, True) 
+
+        # failure
+        return None
 
     def need_to_find(self, named_chunk):
         self.named_chunk.append(named_chunk)
@@ -131,6 +160,19 @@ class libido_parser():
             old_l = self.output[n-1]
             self.output[n-1] = [old_l, chunk_of_code ]
 
+    def analyze_line(self, parser, matcher):
+        """
+        analyze_line() : parse a single line of libido code and collect info
+        Called from inside languages parser only. See bash_parser.parse()
+        """
+        t = self.tokenize(matcher)
+
+        if t:
+            if t.action == 'verbatim' and t.open:
+                parser.verbatim_start(t.args)
+            elif t.action == 'verbatim' and t.close:
+                parser.verbatim_end()
+
     def parse(self, filename):
         #open file in reading mode unicode
         f = open(filename, 'rU')
@@ -142,8 +184,6 @@ class libido_parser():
 
         # reading file (line by line)
         n = 0
-        collect = False
-        verbatim = None
         for line in f:
             n += 1
             self.d['line_count'] += 1
@@ -158,9 +198,11 @@ class libido_parser():
                 if p:
                     if p.action == 'assign':
                         self.assign(n, p.var, p.args)
-                        
                     elif p.action == 'expand':
-                        self.add_expansion(n, p.expand_arg)
+                        self.add_expansion(n, p.args)
+                    elif p.action == 'depend':
+                        # in specific parser? ex: bash
+                        pass
                 else:
                     printerr('parsre error:%d:%s' % (n, line.rstrip()))
 

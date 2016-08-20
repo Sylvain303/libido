@@ -127,10 +127,13 @@ Note: `open_marker` is `libido:` embeded in comment
 * `libido_action`:
  * `VARIABLE` '=' `parser_name` `LIST`
  * 'expand' `VARIABLE`
+ * `depend` `LIST`
 * `parser_name`:
  * 'bash'
 * `VARIABLE`: `[a-zA-Z_][a-zA-Z0-9_]*`
 * `LIST`: '(' `VARIABLE`, ... ')'
+
+`depend` is used inside languages parsers as an dependencies hint.
 
 ### example of syntax
 ~~~

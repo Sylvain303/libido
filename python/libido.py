@@ -4,10 +4,13 @@
 #
 # libido - python prototype
 # 
-# example: python libido.py ../examples/readme_ex0.sh
+# examples: 
+#   # expand or update readme_ex0.sh with code defined in 'lib_source' See libido.conf
+#   ./libido.py ../examples/readme_ex0.sh
 #
 # Usage: libido [OPTIONS] SOURCE_FILE ...
 #
+# /!\ WARNING ! None of this is working yet!
 # OPTIONS:
 #  -n          dry run
 #  -v          verbose

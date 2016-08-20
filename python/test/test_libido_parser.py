@@ -6,8 +6,6 @@ import libido_parser
 import parser_factory
 import pytest
 
-
-
 def _find_examples():
     path = os.path.realpath('../../examples/libido/')
     assert os.path.isdir(path)
@@ -77,3 +75,53 @@ def test_flat_line():
     r = libido_parser.flat_line(v)
     assert r == 'some text\n'
 
+def test_tokenize():
+    """
+    require REMatcher
+    """
+    from rematcher import REMatcher
+    p = _create_parser()
+
+    t = p.tokenize(REMatcher('fail'))
+    assert t == None
+
+    # triming REMatcher line is not tokenize()'s job
+    t = p.tokenize(REMatcher('depend(die)'))
+    assert t.action == 'depend'
+    assert t.args[0] == 'die'
+
+    t = p.tokenize(REMatcher('somevar=parser_here(die, something)'))
+    assert t.action == 'assign'
+    assert t.args == [ 'die', 'something' ]
+    assert t.parser == 'parser_here'
+
+    # inside parsing triming, OK
+    t2 = p.tokenize(REMatcher('somevar = parser_here (  die  ,   something  )'))
+    # same thing
+    assert t == t2
+
+    t = p.tokenize(REMatcher('expand  somevar '))
+    assert t.action == 'expand'
+    assert t.args == 'somevar'
+
+def test_analyze_line():
+    """
+    require bash_parser, REMatcher
+    """
+    p = _create_parser()
+
+    from bash_parser import Bash_parser
+    from rematcher import REMatcher
+
+    bp = Bash_parser(p.config, p.parser_factory)
+    bp.init_parser()
+
+    bp.n = 10
+    p.analyze_line(bp, REMatcher('verbatim (pipo){'))
+    assert bp.chunks['pipo']['start'] == 10
+
+    bp.n = 30
+    p.analyze_line(bp, REMatcher('}'))
+    assert bp.chunks['pipo']['end'] == 30
+
+    assert bp.chunks == {'pipo' : {'start': 10, 'end' : 30 }}

@@ -4,9 +4,8 @@
 #
 # libido - python prototype
 #
-# ouput - Comment / matched function and verbatim blocks / lines of code matched
-# can be filtered with: | grep '^[^ #]'
-# Usage: python bash_parser.py ../examples/libido/shell_lib.bash | grep '^[^# ]'
+# bash_parser : parse a bash input file for libido collecing code
+# or for bash input for libido_parser
 
 import sys
 import re
@@ -15,22 +14,17 @@ import os
 re.UNICODE
 re.LOCALE
 
-class REMatcher(object):
-    def __init__(self, matchstring):
-        self.line = matchstring
-
-    def match(self,regexp):
-        self.rematch = re.search(regexp, self.line)
-        return bool(self.rematch)
-
-    def group(self,i):
-        return self.rematch.group(i)
+# local import
+from rematcher import REMatcher
+import libido_parser
 
 class Bash_parser():
     def __init__(self, config, parser_factory):
         self.config = config
+        # not used
         self.parser_factory = parser_factory
         self.lines = []
+        self.libido_parser = libido_parser.libido_parser(config, parser_factory)
 
     def print_chunks(self):
         for name in self.chunks:
@@ -46,42 +40,57 @@ class Bash_parser():
             chunk_lines.append(self.lines[i-1])
         return chunk_lines
 
-    def parse(self, filename):
-        #open file in reading mode unicode
-        f = open(filename, 'rU')
+    def verbatim_start(self, verbatim):
+        if self.collect:
+            raise RuntimeError('parse error:%d: verbatim open nested found' % self.n)
+
+        self.verbatim = verbatim
+        self.collect = True
+        self.chunks[verbatim] = { 'start' : self.n }
+
+    def verbatim_end(self):
+        if self.collect:
+            self.chunks[self.verbatim]['end'] = self.n
+            self.collect = False
+            self.verbatim = None
+        else:
+            raise RuntimeError('parse error:%d: verbatim close unmatched' % self.n)
+
+    def init_parser(self):
         # some counter
         self.d = {
-                'line_count' : 0,
-                'comments' : 0,
-                'empty' : 0,
-                'libido' : 0,
-                'function' : 0,
-                }
+            'line_count' : 0,
+            'comments' : 0,
+            'empty' : 0,
+            'libido' : 0,
+            'function' : 0,
+        }
 
         self.chunks = {}
         self.lines = []
 
         # reading file (line by line)
-        n = 0
+        self.n = 0
+        self.verbatim = None
+        self.collect = False
+
+    def parse(self, filename):
+        self.init_parser()
+
+        #open file in reading mode unicode
+        f = open(filename, 'rU')
         func_name = None
-        collect = False
-        verbatim = None
         for line in f:
-            n += 1
+            self.n += 1
             self.d['line_count'] += 1
             m = REMatcher(line.rstrip('\n'))
+            # line are stored with their \n
             self.lines.append(line)
 
+            # match a libido tag
             if m.match(r'libido:'):
                 self.d['libido'] += 1
-                if m.match(r'verbatim\(([^)]+)\)'):
-                    collect = True
-                    verbatim = m.group(1)
-                    self.chunks[verbatim] = { 'start' : n+1 }
-                elif m.match(r'\}') and collect:
-                    self.chunks[verbatim]['end'] = n-1
-                    collect = False
-                    verbatim = None
+                self.libido_parser.analyze_line(self, m)
 
             if m.match(r'^\s*#'):
                 self.d['comments'] += 1
@@ -90,43 +99,11 @@ class Bash_parser():
             elif m.match(r'^(function)?\s*([a-zA-Z][a-zA-Z0-9_]*)\s*\(\)'):
                 self.d['function'] += 1
                 func_name = m.group(2)
-                self.chunks[func_name] = { 'start' : n }
+                self.chunks[func_name] = { 'start' : self.n }
             elif m.match(r'^\}') and func_name:
-                self.chunks[func_name]['end'] = n
+                self.chunks[func_name]['end'] = self.n
                 func_name = None
 
         f.close()
 
         return self.d
-
-def main():
-    # verify script number of arguments
-    nargv = len(sys.argv)
-    if nargv < 1:
-        print 'usage: bash_parser.py INPUT'
-        sys.exit(1)
-        
-    filename = sys.argv[1]
-
-    p = Bash_parser()
-    d = p.parse(filename)
-
-    # output stats
-    out = "# %s " % ( os.path.basename(filename) )
-    no_print = []
-    out += '('
-    for stat in d:
-        if stat in no_print:
-            continue
-        # trunk 2 chars
-        out += "%s : %d, " % (stat[0:2], d[stat])
-    out = re.sub(r', $', ')', out)
-
-    print out
-
-    # print all matched chunks of code
-    p.print_chunks()
-
-
-if __name__ == '__main__':
-    main()
