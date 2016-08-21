@@ -8,29 +8,42 @@
 #   # expand or update readme_ex0.sh with code defined in 'lib_source' See libido.conf
 #   ./libido.py ../examples/readme_ex0.sh
 #
-# Usage: libido [OPTIONS] SOURCE_FILE ...
+# Usage: libido [options] SOURCE_FILE ...
 #
 # /!\ WARNING ! None of this is working yet!
-# OPTIONS:
+# options:
 #  -n          dry run
 #  -v          verbose
 #  -b=[suffix] backup with suffix (incremental backup)
 #  -r          revert?
 #  -e          export back marked piece of code
+
+# empty line above ^^
 from __future__ import print_function
 
 import sys
 import re
 import os
 
+# docopt : pip install --user docopt=0.6.2
+from docopt import docopt
+
+# libido local lib
 import parser_factory
 import libido_parser
 from helper import printerr
 
-def usage():
-    # with sed: [[ "$1" == "--help" ]] && { sed -n -e '/^# Usage:/,/^$/ s/^# \?//p' < $0; exit; }
-    f = open(sys.argv[0])
+def get_usage(filename=None):
+    """
+    get_usage() : only extract top header comment
+
+    with sed: [[ "$1" == "--help" ]] && { sed -n -e '/^# Usage:/,/^$/ s/^# \?//p' < $0; exit; }
+    """
+    if filename == None:
+        filename = sys.argv[0]
+    f = open(filename)
     match = False
+    collector = ''
     for l in f:
         if match and re.match(r'^\s*$', l):
             match = False
@@ -41,8 +54,9 @@ def usage():
 
         if match:
             out = re.sub(r'^# ?', '', l)
-            print(out.rstrip())
+            collector += out
     f.close()
+    return collector
 
 def readconfig(fname):
     f = open(fname)
@@ -87,19 +101,17 @@ def readconfig(fname):
     return config
 
 def main():
-    # verify script number of arguments
-    nargv = len(sys.argv)
-    if nargv <= 1:
-        usage()
-        sys.exit(1)
-      
+    arguments = docopt(get_usage(), version='0.1')
+    printerr(arguments)
+
     # process agrument
-    filename = sys.argv[1]
+    filename = arguments['SOURCE_FILE'][0]
 
     # process config
     config_base = 'libido.conf'
     conf = None
 
+    # eval our own location
     mydir = os.path.dirname(os.path.realpath(__file__))
     look_for_config = [ '.', '.libido', '~/.libido', mydir ]
     for d in look_for_config:
@@ -115,35 +127,35 @@ def main():
     printerr('filename=%s' % filename)
     factory = parser_factory.parser_factory(conf)
 
-    parser = factory.get_parser(filename)
-    if not parser:
-        raise RuntimeError("no parser found for '%s' type: %s" % (filename, file_type))
-
-    d = parser.parse(filename)
-
-    # output stats
-    out = "# %s " % ( os.path.basename(filename) )
-    no_print = []
-    out += '('
-    for stat in d:
-        if stat in no_print:
-           continue
-        # or trunk to 2 chars with stat[0:2]
-        out += "%s : %d, " % (stat, d[stat])
-
-    out = re.sub(r', $', ')', out)
-
-    # display all functions found
-    if d['function'] > 0:
-        # list all
-        out += "\n%s" % ' '.join(parser.chunks.keys())
-        # output + start
-        for f in parser.chunks.keys():
-            out += "\n%s:%d" % (f, parser.chunks[f]['start'])
-        # print all matched chunks of code
-        parser.print_chunks()
-
-    printerr(out)
+#    parser = factory.get_parser(filename)
+#    if not parser:
+#        raise RuntimeError("no parser found for '%s' type: %s" % (filename, file_type))
+#
+#    d = parser.parse(filename)
+#
+#    # output stats
+#    out = "# %s " % ( os.path.basename(filename) )
+#    no_print = []
+#    out += '('
+#    for stat in d:
+#        if stat in no_print:
+#           continue
+#        # or trunk to 2 chars with stat[0:2]
+#        out += "%s : %d, " % (stat, d[stat])
+#
+#    out = re.sub(r', $', ')', out)
+#
+#    # display all functions found
+#    if d['function'] > 0:
+#        # list all
+#        out += "\n%s" % ' '.join(parser.chunks.keys())
+#        # output + start
+#        for f in parser.chunks.keys():
+#            out += "\n%s:%d" % (f, parser.chunks[f]['start'])
+#        # print all matched chunks of code
+#        parser.print_chunks()
+#
+#    printerr(out)
 
     lparser = libido_parser.libido_parser(conf, factory)
     lparser.parse(filename)
