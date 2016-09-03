@@ -1,6 +1,6 @@
 #!/bin/bash 
 #
-# libido: bash_code=bash(die, docopts)
+# libido: bash_code=bash(die)
 #
 # Howto Rebuild: rebuild this code with:
 # $ libido examples/readme_ex0.sh

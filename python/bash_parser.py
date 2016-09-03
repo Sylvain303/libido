@@ -5,7 +5,7 @@
 # libido - python prototype
 #
 # bash_parser : parse a bash input file for libido collecing code
-# or for bash input for libido_parser
+# or as a delegate class for bash input for libido_parser See libido_parser.analyze_line()
 
 import sys
 import re
@@ -16,15 +16,12 @@ re.LOCALE
 
 # local import
 from rematcher import REMatcher
-import libido_parser
 
 class Bash_parser():
-    def __init__(self, config, parser_factory):
+    def __init__(self, config, libido_parser):
         self.config = config
-        # not used
-        self.parser_factory = parser_factory
         self.lines = []
-        self.libido_parser = libido_parser.libido_parser(config, parser_factory)
+        self.libido_parser = libido_parser
 
     def print_chunks(self):
         for name in self.chunks:
@@ -40,6 +37,14 @@ class Bash_parser():
             chunk_lines.append(self.lines[i-1])
         return chunk_lines
 
+#-                if m.match(r'verbatim\(([^)]+)\)'):
+#-                    collect = true
+#-                    verbatim = m.group(1)
+#-                    self.chunks[verbatim] = { 'start' : n+1 }
+#-                elif m.match(r'\}') and collect:
+#-                    self.chunks[verbatim]['end'] = n-1
+#-                    collect = false
+#-                    verbatim = none
     def verbatim_start(self, verbatim):
         if self.collect:
             raise RuntimeError('parse error:%d: verbatim open nested found' % self.n)

@@ -1,6 +1,6 @@
 #!/bin/bash 
 #
-# libido: bash_code=bash(die, docopts)
+# libido: bash_code=bash(die)
 #
 # Howto Rebuild: rebuild this code with:
 # $ libido examples/readme_ex0.sh
@@ -13,8 +13,6 @@ die() {
     echo "$*"
     exit 1
 }
-
-# missing: docopts
 echo 'some more code using die() and or docopts'
 if [[ -z "$1" ]]
 then

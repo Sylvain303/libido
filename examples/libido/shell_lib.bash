@@ -11,7 +11,7 @@ die() {
 }
 
 # helper, test if a shell program exists in PATH
-# libido: depend(die)
+# libido: depend test_tool(die)
 test_tool() {
     local cmd=$1
     if type $cmd > /dev/null

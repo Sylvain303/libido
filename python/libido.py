@@ -157,7 +157,7 @@ def main():
 #
 #    printerr(out)
 
-    lparser = libido_parser.libido_parser(conf, factory)
+    lparser = factory.libido_parser
     lparser.parse(filename)
     # no extra newline
     print(lparser.dump_result(), end='')

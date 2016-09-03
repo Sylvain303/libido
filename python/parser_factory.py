@@ -18,6 +18,7 @@ import re
 # add parser here + __init__ + detect
 import bash_parser
 import dummy_parser
+import libido_parser
 
 class parser_factory():
     def __init__(self, config):
@@ -27,19 +28,28 @@ class parser_factory():
                 'dummy' : dummy_parser.dummy_parser,
                 }
 
+        # inter depend parser, we share config and the factory
+        self.libido_parser = libido_parser.libido_parser(self.config, self)
+
     def detect(self, filename):
         if re.search(r'\.(sh|bash)$', filename):
             return 'bash'
         else:
             return 'dummy'
 
-    def get_parser(self, filename):
-        file_type = self.detect(filename)
+    def get_parser(self, filename, type_parser=None):
+        if filename and not type_parser:
+            # default behavior
+            file_type = self.detect(filename)
+        elif type_parser and not filename:
+            file_type = type_parser
+        else:
+            raise RuntimeError('get_parser: filename or type_parser')
 
         parser = self.parsers.get(file_type)
 
         # attribute itself so a parser can create another parser
-        p =  parser(self.config, self)
+        p =  parser(self.config, self.libido_parser)
         p.name = file_type
 
         return p

@@ -19,3 +19,12 @@ def test_get_parser():
     p = factory.get_parser(fname)
 
     assert p.name == 'bash'
+
+    # pass parser type directly
+    p = factory.get_parser(filename=None, type_parser='bash')
+    assert p.name == 'bash'
+
+    # same libido_parser for all parser
+    lp = factory.libido_parser
+    assert p.libido_parser == lp
+
