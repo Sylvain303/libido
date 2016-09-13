@@ -58,7 +58,7 @@ def test_dependencies():
     p = _create_parser(lp)
     p.parse('input.bash')
 
-    expect = {'one': symbol(var=False, chunk=True, deps=[]),
-             'three': symbol(var=False, chunk=True, deps=['two']),
-              'two': symbol(var=False, chunk=True, deps=['one'])}
+    expect = {'one': symbol(tsym='chunk', deps=[]),
+             'three': symbol(tsym='chunk', deps=['two']),
+              'two': symbol(tsym='chunk', deps=['one'])}
     assert p.libido_parser.token_map == expect 

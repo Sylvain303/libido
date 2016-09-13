@@ -168,3 +168,37 @@ def test_analyze_line():
     assert bp.chunks['pipo']['end'] == 30
 
     assert bp.chunks == {'pipo' : {'start': 10, 'end' : 30 }}
+
+def test_get_dep():
+    p = _create_parser()
+    p.token_map = {
+            'code': symbol(tsym='var', deps=['three']),
+            'die': symbol(tsym='chunk', deps=[]),
+            'one': symbol(tsym='chunk', deps=[]),
+            'test_tool': symbol(tsym='chunk', deps=['die']),
+            'three': symbol(tsym='chunk', deps=['two']),
+            'two': symbol(tsym='chunk', deps=['one'])
+            }
+
+    d = p.get_dep('three')
+    assert sorted(d) == sorted(['one', 'two', 'three'])
+
+    d = p.get_dep('three', not_me=True)
+    assert sorted(d) == sorted(['one', 'two'])
+
+    d = p.get_dep('code', not_me=True)
+    assert sorted(d) == sorted(['one', 'two', 'three'])
+
+    d = p.get_dep('die')
+    assert d == ['die']
+
+def test_resolve_dependancies():
+    p = _create_parser()
+    p.parse('in_with_dep.sh')
+
+    # call twice
+    r1 = p.resolve_dependancies()
+    r2 = p.resolve_dependancies()
+    assert r1 == r2
+
+

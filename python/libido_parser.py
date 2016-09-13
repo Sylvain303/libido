@@ -35,7 +35,7 @@ def flat_line(list_of_lines):
                 out += l + '\n'
     return out
 
-symbol = namedtuple('symbol', 'var chunk deps')
+symbol = namedtuple('symbol', 'tsym deps')
 
 class libido_parser():
     def __init__(self, config, parser_factory):
@@ -103,7 +103,7 @@ class libido_parser():
         return None
 
     def assign(self, chunk_name, deps):
-        self.token_map[chunk_name] = symbol(var=True, chunk=False, deps=deps)
+        self.token_map[chunk_name] = symbol(tsym='var', deps=deps)
 
     def add_dependency(self, top_func, deps):
         """
@@ -115,16 +115,19 @@ class libido_parser():
             self.token_map[top_func].deps.extend(deps)
         else:
             # not an assign (ie: no line num)
-            self.token_map[top_func] = symbol(var=False, chunk=True, deps=deps)
+            self.token_map[top_func] = symbol(tsym='chunk', deps=deps)
         # add all deps symbols without dependency
         for name in deps:
             if name not in self.token_map:
-                self.token_map[name] = symbol(var=False, chunk=True, deps=[])
+                self.token_map[name] = symbol(tsym='chunk', deps=[])
 
-    def get_dep(self, chunk_name, rec_seen = {}):
+    def get_dep(self, chunk_name, rec_seen = None, not_me=False):
         """
         get_dep() : return dependencies list looked up recursivly from token_map{}
         """
+        if rec_seen is None:
+            rec_seen = {}
+
         if chunk_name in rec_seen:
             return []
 
@@ -140,8 +143,11 @@ class libido_parser():
             uniq_dep.update(self.get_dep(d, uniq_dep))
             uniq_dep.add(d)
 
-        # unordered list of chunk_name
-        return list(uniq_dep)
+        # return an unordered list of chunk_name
+        if not_me:
+            return list(uniq_dep - set([chunk_name]))
+        else:
+            return list(uniq_dep)
 
     def add_expansion(self, num, expand_name):
         l = self.expand_memo.get(expand_name)
@@ -255,9 +261,9 @@ class libido_parser():
         self.load_lib()
         var = []
         self.resolved_dep = {}
-        missing = []
+        self.missing = []
         for name, symb in self.token_map.items():
-            if symb.var:
+            if symb.tsym == 'var':
                 var.append(name)
                 continue
 
@@ -265,20 +271,11 @@ class libido_parser():
                 continue
 
             if len(symb.deps) == 0:
-                self.resolved_dep[name] = []
+                # single func
+                c = self.find_chunk(name)
+                self.resolved_dep[name] = c
             else:
-                more_dep = self.get_dep(name)
-                for tok in more_dep:
-                    if tok in self.resolved_dep:
-                        continue
-
-                    c = self.find_chunk(tok)
-                    if c:
-                        self.resolved_dep[tok] = c
-                    else:
-                        missing.append(tok)
-                self.resolved_dep[name]['deps'] = more_dep
-                self.resolved_dep[name]['deps'].remove(name)
+                self.sub_dep_resolve(name)
 
         for v in var:
             deps = self.token_map[v].deps
@@ -286,15 +283,40 @@ class libido_parser():
             for d in deps:
                 if d not in self.resolved_dep:
                     missed += 1
-                    missing.append(d)
+                    self.missing.append(d)
             if not missed:
                 self.resolved_dep[v] = deps
 
-        if len(missing) > 0:
-            raise RuntimeError('missing dependencies: %s' % ', '.join(missing))
-    
+        if len(self.missing) > 0:
+            raise RuntimeError('missing dependencies: %s' % ', '.join(self.missing))
+
         # recursive deps are not resolved
         return self.resolved_dep
+
+    def sub_dep_resolve(self, chunk_name, seen = None):
+        if seen is None:
+            seen = set()
+        if chunk_name in seen:
+            return
+
+        seen.add(chunk_name)
+        more_dep = self.get_dep(chunk_name)
+        for tok in more_dep:
+            if tok in self.resolved_dep:
+                continue
+
+            c = self.find_chunk(tok)
+            if c:
+                self.resolved_dep[tok] = c
+            else:
+                self.missing.append(tok)
+
+            for sub in self.get_dep(tok, not_me=True):
+                self.sub_dep_resolve(sub, seen)
+
+        self.resolved_dep[chunk_name]['deps'] = more_dep
+        # dont include itself in deps
+        self.resolved_dep[chunk_name]['deps'].remove(chunk_name)
 
     def dump_result(self):
         """
