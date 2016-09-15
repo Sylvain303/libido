@@ -8,7 +8,7 @@
 
 ## run tests
 
-~~~
+~~~bash
 cd python/
 bats all.bats
 ~~~
