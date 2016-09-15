@@ -1,13 +1,24 @@
 #!/bin/bash
 
-source init.sh
+# define vars for folders
+source default_vars.sh
 
 @test "render readme_ex0.sh" {
     ex=readme_ex0.sh
-    in=$ex_dir/$ex
-    out=$out_dir/$ex
-    expected=$expect_dir/$ex
+    in=$EX_DIR/$ex
+    out=$OUT_DIR/$ex
+    expected=$EXPECT_DIR/$ex
 
-    $libido $in > $out
+    $LIBIDO $in > $out
+    diff -u $expected $out
+}
+
+@test "with dep" {
+    ex=in_with_dep.sh
+    in=$ex
+    out=$OUT_DIR/$ex
+    expected=$EXPECT_DIR/$ex
+
+    $LIBIDO $in > $out
     diff -u $expected $out
 }

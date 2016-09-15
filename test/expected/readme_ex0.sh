@@ -9,6 +9,7 @@ echo 'some code here'
 
 # libido code will be included/ updated here
 # libido: expand bash_code
+# expanded from: bash_code => die
 die() {
     echo "$*"
     exit 1
