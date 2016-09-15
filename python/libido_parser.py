@@ -285,7 +285,11 @@ class libido_parser():
                     missed += 1
                     self.missing.append(d)
             if not missed:
-                self.resolved_dep[v] = deps
+                # expand all deps once
+                expand_deps = set(deps)
+                for d in deps:
+                    expand_deps.update(self.get_dep(d))
+                self.resolved_dep[v] = list(expand_deps)
 
         if len(self.missing) > 0:
             raise RuntimeError('missing dependencies: %s' % ', '.join(self.missing))
@@ -327,24 +331,36 @@ class libido_parser():
         """
         self.resolve_dependancies()
 
-        # duplicate lines
+        # duplicate input lines
         self.output = self.lines[:]
+        # prevent multiple expansion
+        chunk_expanded = set()
 
         for tok, places in self.expand_memo.items():
             c = self.resolved_dep.get(tok)
+            all_chunk = []
             if isinstance(c, list):
-                all_chunk = []
-                # sub fetch dependencies
-                for d in c:
-                    all_chunk.extend(self.resolved_dep.get(d)['lines'])
+                # deps are expanded by resolve_dependancies()
+                deps = c
+                all_chunk.append('# expanded from: %s => %s' % (tok, ','.join(c)))
             else:
-                all_chunk = c['lines']
-                for d in c.get('deps', []):
-                    all_chunk.extend(self.resolved_dep.get(d)['lines'])
+                if tok in chunk_expanded:
+                    continue
+                deps = c.get('deps', [])
+                all_chunk.append('# expanded from: %s' % tok)
+                all_chunk.extend(c['lines'])
+                chunk_expanded.add(d)
+
+            # fetch sub dependencies if any
+            for d in deps:
+                if d in chunk_expanded:
+                    continue
+                all_chunk.extend(self.resolved_dep[d]['lines'])
+                chunk_expanded.add(d)
 
             self.apply_chunk(tok, all_chunk)
 
-        # concatenate all lines faltten
+        # concatenate all lines flatten
         out = ''
         for l in self.output:
             out += flat_line(l)

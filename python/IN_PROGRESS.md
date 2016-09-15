@@ -9,9 +9,5 @@ not working yet `dump_result()` with introduced dependancies
 
 ## deep code analyze
 
-`libido_parser.token_map` is be changed during `load_lib()`, by sup-parser, `libido_parser` is kept between all parsers
-via `parser_factory`
-
-## `libido_parser.py`
-
-assignment could be differenciated from found ref in lib: `bash_code` dont depend on itself. Stored in `token_map`
+`libido_parser.token_map{}` is completedd during `load_lib()`, by sup-parser.
+`libido_parser` instance is kept between all parsers via `parser_factory`

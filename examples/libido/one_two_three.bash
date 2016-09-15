@@ -11,7 +11,7 @@ one() {
 two() {
     for i in $(seq 1 2)
     do
-        one
+        echo "two:$(one)"
     done
 }
 

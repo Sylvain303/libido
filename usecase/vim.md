@@ -2,15 +2,16 @@
 
 * complete your code
 * export your code
+* import in your code
 
 ## Examples
 
 The examples suppose that you have a correcly configured `libido.conf`.
 Referencing your own `lib_source` local or remote.
 
-### Expansion in by parsing your code
+### Expansion in your code by parsing the code
 
-Enter the text in your buffer (here bash):
+Enter the text in your vim buffer (here bash):
 
 ~~~bash
 # libido: expand die
@@ -23,7 +24,7 @@ and execute a vim function
 :Libido
 ~~~
 
-Produce under the libido marker
+add the code under the libido marker, as a modified buffer
 
 ~~~bash
 die() {
@@ -40,7 +41,7 @@ Which represents the equivalent of:
 * `:r the_code_containing_die` (or copy/paste)
 * remove unwanted lines if any
 
-### Expansion in by issuing an `expand`
+### Expansion by issuing an `expand`
 
 execute a vim function:
 
@@ -64,7 +65,7 @@ die() {
 * select a portion of code
 * run: `:Libido export`
 * the code is exported, named with what detected in the parsed code (function's name, named chuck)
-  * in no name is detected a prompt for the name is asked
+  * if no name is detected, a prompt will asks for.
 * no modification in the buffer
 
 #### Taged export
