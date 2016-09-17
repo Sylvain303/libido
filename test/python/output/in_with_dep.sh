@@ -4,9 +4,8 @@
 #
 # libido: expand code
 # expanded from: code => three,two,one
-three() {
-    echo "code for three"
-    two
+one() {
+    echo "code for one"
 }
 two() {
     for i in $(seq 1 2)
@@ -14,8 +13,9 @@ two() {
         echo "two:$(one)"
     done
 }
-one() {
-    echo "code for one"
+three() {
+    echo "code for three"
+    two
 }
 
 three ici

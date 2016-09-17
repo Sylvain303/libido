@@ -21,4 +21,7 @@ source default_vars.sh
 
     $LIBIDO $in > $out
     diff -u $expected $out
+    # test expected output
+    chmod a+x $out
+    diff -u ${expected}.out <($out)
 }

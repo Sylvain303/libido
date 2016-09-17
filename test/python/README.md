@@ -13,6 +13,8 @@ bats all.bats
 
 ## rebuild expectations
 
+build source with libido and also execute script for catching output as expectation
+
 ~~~bash
 ./build_expected.sh
 ~~~

@@ -270,12 +270,7 @@ class libido_parser():
             if name in self.resolved_dep:
                 continue
 
-            if len(symb.deps) == 0:
-                # single func
-                c = self.find_chunk(name)
-                self.resolved_dep[name] = c
-            else:
-                self.sub_dep_resolve(name)
+            self.sub_dep_resolve(name)
 
         for v in var:
             deps = self.token_map[v].deps
@@ -294,10 +289,14 @@ class libido_parser():
         if len(self.missing) > 0:
             raise RuntimeError('missing dependencies: %s' % ', '.join(self.missing))
 
-        # recursive deps are not resolved
+        # returned for debuging purpose
         return self.resolved_dep
 
     def sub_dep_resolve(self, chunk_name, seen = None):
+        """
+        sub_dep_resolve() : recursivly resolve all deps for chunk_name into resolved_dep{}
+        add missing deps in missing[]
+        """
         if seen is None:
             seen = set()
         if chunk_name in seen:
@@ -315,19 +314,24 @@ class libido_parser():
             else:
                 self.missing.append(tok)
 
+            # resolve sub deps recursivly
             for sub in self.get_dep(tok, not_me=True):
                 self.sub_dep_resolve(sub, seen)
 
         self.resolved_dep[chunk_name]['deps'] = more_dep
-        # dont include itself in deps
-        self.resolved_dep[chunk_name]['deps'].remove(chunk_name)
+
+    def order_chunk(self, list_deps):
+        copy_deps = list_deps[:]
+        copy_deps.sort(lambda a, b:
+                cmp(self.resolved_dep[a]['start'], self.resolved_dep[b]['start']))
+        return copy_deps
 
     def dump_result(self):
         """
         dump_result() : after the main code has been parsed, apply the algorithm to dump all the resulting code:
-            resolve_dependancies() will find all the chunks from token_map{} with dependencies
-            loop over expand_memo{} will retrieve and merge together all chunk_of_code
-            apply_chunk() will replace in the output[]
+            - resolve_dependancies() will find all the chunks from token_map{} with dependencies
+            - loop over expand_memo{} will retrieve and merge together all chunk_of_code recursivly.
+            - apply_chunk() will replace in the output[]
         """
         self.resolve_dependancies()
 
@@ -339,22 +343,24 @@ class libido_parser():
         for tok, places in self.expand_memo.items():
             c = self.resolved_dep.get(tok)
             all_chunk = []
+            # c can be a list (var) or a dict (chunk)
             if isinstance(c, list):
-                # deps are expanded by resolve_dependancies()
-                deps = c
+                # deps are expanded (list of recursive deps) by resolve_dependancies()
+                deps = self.order_chunk(c)
+                # line expandsion will happen in the next loop
                 all_chunk.append('# expanded from: %s => %s' % (tok, ','.join(c)))
             else:
                 if tok in chunk_expanded:
                     continue
+                # add all deps + itself
                 deps = c.get('deps', [])
-                all_chunk.append('# expanded from: %s' % tok)
-                all_chunk.extend(c['lines'])
-                chunk_expanded.add(d)
+                deps = self.order_chunk(deps)
 
             # fetch sub dependencies if any
             for d in deps:
                 if d in chunk_expanded:
                     continue
+                # will raise an exception if d is not in resolved_dep{}
                 all_chunk.extend(self.resolved_dep[d]['lines'])
                 chunk_expanded.add(d)
 
