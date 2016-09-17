@@ -1,0 +1,35 @@
+--- a/src/lexer.l
+-%}
+-%{
+-#define RET(val) p(#val, yytext); return val
+-%}
+-    INT_CHANGER(function_body);
+-    INT_CHANGER(unparsed_code);
+-IDENTIFIER  [A-Za-z][A-Za-z0-9_]*
+-COMMENT     #
+-INDENT      ^[ \t]+
+-%x comment libido function_body code unparsed_code
+-    /* helpers, will change start condition from bison */
+-    CHANGE_IF(function_body);
+-    CHANGE_IF(unparsed_code);
+-
+-<comment>libido:        p("<libido=>", ""); BEGIN(libido);
+-<comment>\n             BEGIN(0);
+-<libido>\n              BEGIN(0);
+-<libido>.               p("<l", yytext); return yytext[0];
+-
+-<function_body>{INDENT}         BEGIN(code); RET(INDENT);
+-<function_body>{COMMENT}[^\n]+  RET(COMMENT_LINE);
+-<function_body>\n               ;
+-<function_body>\}               BEGIN(0); return '}';
+-<code>{COMMENT}.*               BEGIN(function_body); RET(COMMENT_LINE);
+-<code>.*                        BEGIN(function_body); RET(CODE);
+-<unparsed_code>{COMMENT}[ \t]*libido:   BEGIN(libido);
+-<unparsed_code>.                        ;
+-<unparsed_code>\n                       ;
+-{COMMENT}           p("COM", yytext); BEGIN(comment);
+-{IDENTIFIER}        RET(IDENTIFIER);
+-[ \t]+              ;
+-\n                  ;
+-.                   p("<c", yytext); return yytext[0];
+-%%
