@@ -8,6 +8,17 @@
 from __future__ import print_function
 
 import sys
-def printerr(*args, **kwargs):
-    print(*args, file=sys.stderr, **kwargs)
 
+QUIET=False
+
+def quiet(v = None):
+    global QUIET
+    if v is not None: 
+        QUIET = v
+
+    return QUIET
+
+def printerr(*args, **kwargs):
+    global QUIET
+    if not QUIET:
+        print(*args, file=sys.stderr, **kwargs)

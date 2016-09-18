@@ -8,22 +8,28 @@
 #   # expand or update readme_ex0.sh with code defined in 'lib_source' See libido.conf
 #   ./libido.py ../examples/readme_ex0.sh
 #
-# Usage: libido [options] SOURCE_FILE ...
+# Usage: libido [options] [--] SOURCE_FILE ...
 #
 # /!\ WARNING ! None of this is working yet!
 # options:
-#  -n          dry run
-#  -v          verbose
+#  -v          verbose (messages sent to stderr)
 #  -b=[suffix] backup with suffix (incremental backup)
 #  -r          revert?
-#  -e          export back marked piece of code
+#  -e          export back marked piece of code, to remote_project
+#  -o FILE     output to a named file (instead of inline edit) [default: None]
+#  --diff      no change, diff -u SOURCE_FILE result on stdout
+#  -q          quiet, no output on stderr
 
-# empty line above ^^
+# empty line above required ^^
 from __future__ import print_function
 
 import sys
 import re
 import os
+from tempfile import NamedTemporaryFile
+import shutil
+
+
 
 # docopt : pip install --user docopt=0.6.2
 from docopt import docopt
@@ -31,7 +37,7 @@ from docopt import docopt
 # libido local lib
 import parser_factory
 import libido_parser
-from helper import printerr
+from helper import printerr, quiet
 
 def get_usage(filename=None):
     """
@@ -101,10 +107,14 @@ def readconfig(fname):
     return config
 
 def main():
+    # command line processing
     arguments = docopt(get_usage(), version='0.1')
+    if arguments['-q']:
+        quiet(True)
+
     printerr(arguments)
 
-    # process agrument
+    # process filename's agrument, only the first for now
     filename = arguments['SOURCE_FILE'][0]
 
     # process config
@@ -125,43 +135,43 @@ def main():
         raise RuntimeError("no config found")
 
     printerr('filename=%s' % filename)
+
     factory = parser_factory.parser_factory(conf)
-
-#    parser = factory.get_parser(filename)
-#    if not parser:
-#        raise RuntimeError("no parser found for '%s' type: %s" % (filename, file_type))
-#
-#    d = parser.parse(filename)
-#
-#    # output stats
-#    out = "# %s " % ( os.path.basename(filename) )
-#    no_print = []
-#    out += '('
-#    for stat in d:
-#        if stat in no_print:
-#           continue
-#        # or trunk to 2 chars with stat[0:2]
-#        out += "%s : %d, " % (stat, d[stat])
-#
-#    out = re.sub(r', $', ')', out)
-#
-#    # display all functions found
-#    if d['function'] > 0:
-#        # list all
-#        out += "\n%s" % ' '.join(parser.chunks.keys())
-#        # output + start
-#        for f in parser.chunks.keys():
-#            out += "\n%s:%d" % (f, parser.chunks[f]['start'])
-#        # print all matched chunks of code
-#        parser.print_chunks()
-#
-#    printerr(out)
-
     lparser = factory.libido_parser
     lparser.parse(filename)
-    # no extra newline
-    print(lparser.dump_result(), end='')
 
+    # destination
+    dest = arguments['-o']
+    ovrewrite = False
+    need_tmp = False
+
+    if dest == 'None' or dest == filename:
+        ovrewrite = True
+        dest = filename
+        need_tmp = True
+
+    if arguments['--diff']:
+        need_tmp = True
+        ovrewrite = False
+
+    if dest == '-':
+        dest = '/dev/stdout'
+
+    if need_tmp:
+        out = NamedTemporaryFile(delete=False)
+    else:
+        out = open(dest, 'w')
+
+    out.write(lparser.dump_result())
+    out.close()
+
+    if arguments['--diff']:
+        os.system("diff -u %s %s" % (filename, out.name))
+
+    if ovrewrite:
+        shutil.move(out.name, filename)
+    elif need_tmp:
+        os.unlink(out.name)
 
 if __name__ == '__main__':
     main()

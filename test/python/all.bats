@@ -9,7 +9,7 @@ source default_vars.sh
     out=$OUT_DIR/$ex
     expected=$EXPECT_DIR/$ex
 
-    $LIBIDO $in > $out
+    $LIBIDO -o - $in > $out
     diff -u $expected $out
 }
 
@@ -19,7 +19,7 @@ source default_vars.sh
     out=$OUT_DIR/$ex
     expected=$EXPECT_DIR/$ex
 
-    $LIBIDO $in > $out
+    $LIBIDO -o - $in > $out
     diff -u $expected $out
     # test expected output
     chmod a+x $out
