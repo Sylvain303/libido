@@ -6,9 +6,10 @@ import libido
 
 
 def test_readconfig():
+    l = libido.libido({})
     config_file = './libido.conf'
 
-    conf = libido.readconfig(config_file)
+    conf = l.readconfig(config_file)
     assert isinstance(conf, dict)
     assert conf.get('lib_source')
 

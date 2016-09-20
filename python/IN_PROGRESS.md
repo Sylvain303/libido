@@ -2,6 +2,12 @@
 
 command line interface with docopt
 
+=> -e export
+
+## test to add
+
+read /dev/null should not raise error with libido.py (move fail)
+
 ## deeper code analyze
 
 ### `libido_parser`
