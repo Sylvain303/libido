@@ -4,6 +4,24 @@ command line interface with docopt
 
 => -e export
 
+filter export
+
+
+## Taged export
+
+~~~bash
+# libido: export(fail, me)
+fail() {
+  local msg="error: %s"
+  printf "$msg\n" "$1"
+  exit 1
+}
+
+# libido: verbatim(me) {
+me=$(readlink -f "$0")
+# libido: }
+~~~
+
 ## test to add
 
 read /dev/null should not raise error with libido.py (move fail)

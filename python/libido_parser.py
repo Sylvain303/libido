@@ -40,17 +40,21 @@ symbol = namedtuple('symbol', 'tsym deps')
 class libido_parser():
     def __init__(self, config, parser_factory):
         self.config = config
-        # avoid libido open_marker match in this code itself
+        # config is libido section of a ConfigParser object, as well as a simple dict
+        # (avoid libido open_marker match in this code itself)
         self.open_marker = config.get('open_marker', 'libido' + ':')
 
+        # parser_factory creates itself libido_parser
+        self.parser_factory = parser_factory
+        self.reset_parser()
+
+    def reset_parser(self):
         # token_map{} store by chunk names, with dependency as array
         self.token_map = {}
         # expand_memo{} store where expandsion will occur
         self.expand_memo = {}
         # input lines
         self.lines = []
-        # parser_factory creates itself libido_parser
-        self.parser_factory = parser_factory
         self.code_lib = {}
         self.chunks_resolved = {}
         self.chunks_dep = {}
@@ -221,6 +225,8 @@ class libido_parser():
                 self.add_dependency(t.what, t.args)
 
     def parse(self, filename):
+        self.reset_parser()
+
         #open file in reading mode unicode
         f = open(filename, 'rU')
         # some counter

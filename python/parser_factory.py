@@ -21,15 +21,15 @@ import dummy_parser
 import libido_parser
 
 class parser_factory():
-    def __init__(self, config):
-        self.config = config
+    def __init__(self, configparser):
+        self.config = configparser
         self.parsers = { 
                 'bash' : bash_parser.Bash_parser,
                 'dummy' : dummy_parser.dummy_parser,
                 }
 
-        # inter depend parser, we share config and the factory
-        self.libido_parser = libido_parser.libido_parser(self.config, self)
+        # inter dependant parser, we share config and the factory
+        self.libido_parser = libido_parser.libido_parser(self.config['libido'], self)
 
     def detect(self, filename):
         if re.search(r'\.(sh|bash)$', filename):
@@ -49,7 +49,7 @@ class parser_factory():
         parser = self.parsers.get(file_type)
 
         # attribute itself so a parser can create another parser
-        p =  parser(self.config, self.libido_parser)
+        p =  parser(self.config['libido'], self.libido_parser)
         p.name = file_type
 
         return p

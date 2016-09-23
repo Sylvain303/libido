@@ -17,7 +17,8 @@ def _find_examples():
 
 def _create_factory(conf = None):
     if conf == None:
-        conf = {'lib_source' : _find_examples()}
+        # fake configparser
+        conf = {'libido' : {'lib_source' : _find_examples()} }
     f = parser_factory.parser_factory(conf)
     return f
 
@@ -49,7 +50,7 @@ def test__create_parser():
 
 
 def test_load_lib():
-    p = _create_parser(conf={})
+    p = _create_parser(conf={'libido' : {} })
     # raise if no config_location found
     with pytest.raises(RuntimeError):
         p.load_lib()

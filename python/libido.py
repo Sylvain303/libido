@@ -28,6 +28,9 @@ import re
 import os
 from tempfile import NamedTemporaryFile
 import shutil
+import fnmatch
+# pip install --user configparser
+from configparser import ConfigParser, ExtendedInterpolation
 
 
 # docopt : pip install --user docopt=0.6.2
@@ -63,6 +66,17 @@ def get_usage(filename=None):
     f.close()
     return collector
 
+# for ipython debugging
+# => import libido
+# => reload(libido); l = libido.create_l('../examples/readme_ex0.sh')
+def create_l(filename):
+    l = libido({})
+    l.load_config()
+    l.init_factory()
+    l.parse_input(filename)
+    return l
+
+# this class keep track of all information of the libido process
 class libido:
     def __init__(self, arguments):
         self.arguments = arguments
@@ -75,13 +89,21 @@ class libido:
         self.mydir = os.path.dirname(os.path.realpath(__file__))
 
     def load_config(self):
+        """
+        load_config() : search and load libido.conf in `conf`, now use ConfigParser.
+        """
         look_for_config = [ '.', '.libido', '~/.libido', self.mydir ]
+        conf_parser = ConfigParser(interpolation=ExtendedInterpolation(), default_section='libido')
+        self.conf = None
         for d in look_for_config:
             config_file = os.path.join(os.path.expanduser(d), self.config_base)
             if os.path.isfile(config_file):
-                printerr('readconfig=%s' % config_file)
-                self.conf = self.readconfig(config_file)
-                break
+                printerr('configparser=%s' % config_file)
+                r = conf_parser.read(config_file)
+                # when a config is found stop
+                if r[0] == config_file:
+                    self.conf = conf_parser
+                    break
 
         if self.conf == None:
             raise RuntimeError("no config found")
@@ -95,11 +117,16 @@ class libido:
         self.lparser.parse(filename)
 
     def readconfig(self, fname):
+        """
+        DEPRECATED.
+        readconfig() : internal config parser, parse a bash like syntax, ignore inifile section
+        """
         f = open(fname)
         i = 0
         var, val = None, None
         config = {}
 
+        # not used yet
         keywords = """
             remote_location
             remote_project
@@ -113,13 +140,19 @@ class libido:
         """
         allowed = [ k.strip() for k in keywords.strip().split('\n') if len(k) > 1 ]
 
+        missing = []
         # parse config
         for l in f:
             i += 1
-            if re.match(r'^#', l):
+            # skip comment
+            if re.match(r'^\s*#', l):
+                continue
+            # skip inifile section, See load_config()
+            if re.match(r'^\[', l):
                 continue
 
             l = l.rstrip()
+            # skip empty line
             if l == '':
                 continue
 
@@ -129,12 +162,33 @@ class libido:
                 printerr("config:error:%d:split on:'%s'" % (i, l))
                 continue
 
-            if var:
-                printerr('config(%d):%s : %s' % (i, var, val))
-                config[var] = val
-            else:
+            if not var:
+                # split has failed, not an allowed config directive
                 printerr('config:error:%d:no match: %s' % (i,l))
+                continue
 
+            printerr('config(%d):%s : %s' % (i, var, val))
+
+            m = re.match(r'^\$(\i+)', val)
+            if m:
+                # var expand assignment
+                ref = m.group(1)
+                if config.get(ref):
+                    config[var] = config.get(ref)
+                else:
+                    missing.append(ref)
+            else:
+                # normal assignment
+                config[var] = val
+
+        for ref in missing:
+            if config.get(ref):
+                config[var] = config.get(ref)
+            else:
+                # no fail assign an empty var
+                config[var] = None
+
+        f.close()
         return config
 
     def process_output(self, filename, dest):
@@ -172,10 +226,37 @@ class libido:
             os.unlink(out.name)
 
     def process_export(self, filename):
-        pass
+        # filename is already parsed as libido
+        # we have to parse it as it self
+        p = self.factory.get_parser(filename)
+        p.parse(filename)
+
+        tokens =  p.chunks.keys()
+        # order as in the file
+        tokens.sort(lambda a, b: cmp(p.chunks[a]['start'], p.chunks[b]['start']))
+        export_f = fnmatch.filter(tokens, '*')
+
+        # open destination project
+        dest = self.conf['libido'].get('remote_project', "libido_exported.%s")
+        # auto add parser extension
+        if re.search(r'%s', dest):
+            dest = dest % (p.name)
+        dest = os.path.join(self.remote_location, dest)
+        f = open(dest, 'wt')
+        for func in export_f:
+            f.write("# %s\n" % (func))
+            f.write(libido_parser.flat_line(p.get_chunk(p.chunks[func])))
+        f.close()
+
+        printerr("%d func written to '%s'" % (len(export_f), dest))
+
+        return dest
 
     def ensure_remote_access(self):
-        pass
+        remote_location = self.conf['libido'].get('remote_location')
+        remote_location = os.path.dirname(os.path.expanduser(remote_location))
+        self.remote_location = os.path.realpath(remote_location)
+        return self.remote_location
 
 def main():
     # command line processing
@@ -189,10 +270,10 @@ def main():
     l.load_config()
     l.init_factory()
 
-    # destination, default 'None'
-    dest = arguments['-o']
     export = False
 
+    # destination, default 'None'
+    dest = arguments['-o']
     if arguments['-e']:
         if dest != 'None':
             raise RuntimeError('-o not supported with -e')
@@ -202,7 +283,7 @@ def main():
 
     # process filename's agrument, only the first for now
     filename = arguments['SOURCE_FILE'][0]
-    printerr('filename=%s' % filename)
+    printerr('filename=%s, dest=%s' % (filename, dest))
 
     l.parse_input(filename)
 
