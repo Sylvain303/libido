@@ -7,7 +7,7 @@ import pytest
 import sys
 sys.path.append('..')
 # local lib
-from libido_parser import libido_parser, symbol, flat_line
+from libido_parser import libido_parser, symbol
 import parser_factory
 
 def _find_examples():
@@ -85,15 +85,6 @@ def test_dump_result():
     out2 = p.dump_result()
     assert out == out2
 
-def test_flat_line():
-    v = 'some text'
-    r = flat_line(v)
-    assert r == 'some text\n'
-
-    # no double \n
-    inlist = ['one\n', 'two\n', '\n']
-    r = flat_line(inlist)
-    assert r == 'one\ntwo\n\n'
 
 def test_tokenize():
     """

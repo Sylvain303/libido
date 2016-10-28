@@ -22,3 +22,21 @@ def printerr(*args, **kwargs):
     global QUIET
     if not QUIET:
         print(*args, file=sys.stderr, **kwargs)
+
+def flat_line(list_of_lines):
+    """
+    flat_line() : format a list on line as flat str, if is contains a list expand it
+    """
+    if isinstance(list_of_lines, str):
+        list_of_lines = [ list_of_lines ]
+
+    out = ''
+    for l in list_of_lines:
+        if isinstance(l, list):
+            out += '\n'.join([ ll.rstrip() for ll in l])
+        else:
+            if l[-1] == '\n':
+                out += l
+            else:
+                out += l + '\n'
+    return out

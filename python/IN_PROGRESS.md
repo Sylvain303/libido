@@ -4,10 +4,12 @@ command line interface with docopt
 
 => -e export
 
-filter export
+filter export, export code to libido `lib_source` pointed in libido.conf
 
 
 ## Taged export
+
+should export `fail()` and `me` which is an libido alias defined by `verbatim` statement
 
 ~~~bash
 # libido: export(fail, me)
@@ -16,6 +18,7 @@ fail() {
   printf "$msg\n" "$1"
   exit 1
 }
+
 
 # libido: verbatim(me) {
 me=$(readlink -f "$0")

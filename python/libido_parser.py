@@ -15,25 +15,10 @@ from collections import namedtuple
 
 # local lib
 from rematcher import REMatcher
-from helper import printerr
+from helper import printerr, flat_line
 
 re.UNICODE
 re.LOCALE
-
-def flat_line(list_of_lines):
-    if isinstance(list_of_lines, str):
-        list_of_lines = [ list_of_lines ]
-
-    out = ''
-    for l in list_of_lines:
-        if isinstance(l, list):
-            out += '\n'.join([ ll.rstrip() for ll in l])
-        else:
-            if l[-1] == '\n':
-                out += l
-            else:
-                out += l + '\n'
-    return out
 
 symbol = namedtuple('symbol', 'tsym deps')
 
@@ -168,11 +153,9 @@ class libido_parser():
         self.load_lib()
 
         for fname, p in self.code_lib.items():
-            # c is a chunks ref { start: , end: }
-            c = p.chunks.get(chunk_name)
-            if c:
+            if p.chunks.has_key(chunk_name):
                 # lines is a list of str
-                return { 'start' : c['start'] , 'lines' : p.get_chunk(c) }
+                return { 'start' : p.chunks[chunk_name]['start'] , 'lines' : p.get_chunk(chunk_name) }
         return None
 
     def load_lib(self, force=False):

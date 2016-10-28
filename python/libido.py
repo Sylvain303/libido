@@ -27,6 +27,7 @@ import sys
 import re
 import os
 from tempfile import NamedTemporaryFile
+# shutil for move()
 import shutil
 import fnmatch
 # pip install --user configparser
@@ -226,6 +227,10 @@ class libido:
             os.unlink(out.name)
 
     def process_export(self, filename):
+        """
+        process_output() : reparse the filename as an input for our library
+        library destination is given by self.remote_location See ensure_remote_access()
+        """
         # filename is already parsed as libido
         # we have to parse it as it self
         p = self.factory.get_parser(filename)
@@ -238,17 +243,35 @@ class libido:
 
         # open destination project
         dest = self.conf['libido'].get('remote_project', "libido_exported.%s")
+
         # auto add parser extension
         if re.search(r'%s', dest):
             dest = dest % (p.name)
-        dest = os.path.join(self.remote_location, dest)
-        f = open(dest, 'wt')
-        for func in export_f:
-            f.write("# %s\n" % (func))
-            f.write(libido_parser.flat_line(p.get_chunk(p.chunks[func])))
-        f.close()
 
-        printerr("%d func written to '%s'" % (len(export_f), dest))
+        dest = os.path.join(self.remote_location, dest)
+
+        dp = None
+        if os.path.isfile(dest):
+            # parse destination file, to detect function collision
+            dp = self.factory.get_parser(dest)
+            dp.ignore_libido_analyze = True
+            dp.parse(dest)
+
+        if not dp:
+            f = open(dest, 'wt')
+            for func in export_f:
+                f.write("# %s\n" % (func))
+                f.write(libido_parser.flat_line(p.get_chunk(func)))
+            f.close()
+
+            printerr("new file, %d func written to '%s'" % (len(export_f), dest))
+        else:
+            for func in export_f:
+                if dp.update_chunk(func, p):
+                    printerr("updated chunks: '%s'" % func)
+                else:
+                    printerr("chunks: identical '%s'" % func)
+            dp.write()
 
         return dest
 

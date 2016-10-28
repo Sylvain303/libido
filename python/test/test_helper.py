@@ -1,6 +1,6 @@
 import sys
 sys.path.append('..')
-from helper import printerr, quiet
+from helper import printerr, quiet, flat_line
 
 def test_printerr(capsys):
     assert quiet() == False
@@ -24,3 +24,13 @@ def test_printerr(capsys):
     out, err = capsys.readouterr()
     assert out == ''
     assert err == 'pipo3\n'
+
+def test_flat_line():
+    v = 'some text'
+    r = flat_line(v)
+    assert r == 'some text\n'
+
+    # no double \n
+    inlist = ['one\n', 'two\n', '\n']
+    r = flat_line(inlist)
+    assert r == 'one\ntwo\n\n'

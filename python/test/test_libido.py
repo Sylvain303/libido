@@ -38,3 +38,19 @@ def test_get_usage():
 
     assert lines[-2].find('__future__') == -1
 
+def write_tmp(string_of_code):
+    from tempfile import NamedTemporaryFile
+    code = string_of_code.split(';')
+    tmp = NamedTemporaryFile(delete=False)
+    tmp.write("\n".join(code))
+    tmp.close()
+    return tmp.name
+
+def test_process_export():
+    l = libido.libido({})
+    l.load_config()
+    l.init_factory()
+    loc = l.ensure_remote_access()
+    f = write_tmp('die() {;echo "you died";exit 1;}')
+    l.parse_input(f)
+    l.process_export(f)
