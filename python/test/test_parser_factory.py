@@ -12,6 +12,10 @@ def test_detect():
 
     assert t == 'bash'
 
+    fname = './extension_less_bash_test'
+    t = factory.detect(fname)
+    assert t == 'bash'
+
 def test_get_parser():
     conf = {'libido' :{'lib_source' : '../examples/libido/*'} }
     fname = '../../examples/libido/shell_lib.bash'

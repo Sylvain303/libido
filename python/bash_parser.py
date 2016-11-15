@@ -37,11 +37,12 @@ class Bash_parser():
         """
         print_chunks() : simple debug function
         """
-        for name in self.chunks:
-            print "%s: start=%d, end=%d" % (
-                name, self.chunks[name]['start'], self.chunks[name]['end'])
-            for i in xrange(self.chunks[name]['start'], self.chunks[name]['end']+1):
-                print " %3d=> %s" % (i, self.lines[i-1].rstrip('\n'))
+        print("bash parser")
+        for name, chunk in self.sorted_chunks():
+            print("%s: start=%d, end=%d" % (
+                name, chunk['start'], chunk['end']))
+            for i in xrange(chunk['start'], chunk['end']+1):
+                print(" %3d=> %s" % (i, self.lines[i-1].rstrip('\n')))
 
     def get_chunk(self, chunk_name, force_old=False):
         if not force_old and self.new_chunk.has_key(chunk_name):
@@ -132,6 +133,10 @@ class Bash_parser():
         return self.d
 
     def sorted_chunks(self):
+        """
+        sorted_chunks(): return a list of pair (chunk_name, code) in the same order
+        as in the source code.
+        """
         chunks =  self.chunks.keys()
         # order as in the file
         chunks.sort(lambda a, b: cmp(self.chunks[a]['start'], self.chunks[b]['start']))

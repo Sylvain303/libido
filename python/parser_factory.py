@@ -14,6 +14,8 @@
 #    a_parser.parse(some_file_to_parse)
 
 import re
+import magic
+import os
 
 # add parser here + __init__ + detect
 import bash_parser
@@ -34,8 +36,15 @@ class parser_factory():
     def detect(self, filename):
         if re.search(r'\.(sh|bash)$', filename):
             return 'bash'
-        else:
-            return 'dummy'
+        elif re.search(r'^[^.]+$', os.path.basename(filename)):
+            # no extension
+            m = magic.open(magic.MAGIC_NONE)
+            m.load()
+            typef = m.buffer(open(filename).read())
+            if re.search(r'Bourne-Again shell script', typef):
+                return 'bash'
+
+        return 'dummy'
 
     def get_parser(self, filename, type_parser=None):
         if filename and not type_parser:

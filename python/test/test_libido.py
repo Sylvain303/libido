@@ -1,5 +1,6 @@
 import sys
 import configparser
+import os
 
 
 sys.path.append('..')
@@ -20,7 +21,8 @@ def test_load_config():
     assert isinstance(l.conf,configparser.ConfigParser)
     lib_source = l.conf.get('libido', 'lib_source')
     assert lib_source
-    assert l.conf.get('libido', 'remote_location') == lib_source
+    # test against a local folder in test/
+    assert l.conf.get('libido', 'remote_location') == './remote_location'
 
 def test_get_usage():
     out = libido.get_usage()
@@ -46,11 +48,32 @@ def write_tmp(string_of_code):
     tmp.close()
     return tmp.name
 
+def test_ensure_remote_access():
+    l = libido.libido({})
+    l.load_config()
+    assert l.conf['libido'].get('remote_location') == './remote_location'
+
+    loc = l.ensure_remote_access()
+
+    pwd = os.path.realpath('.')
+    assert l.remote_location == pwd + '/remote_location'
+
 def test_process_export():
     l = libido.libido({})
     l.load_config()
     l.init_factory()
     loc = l.ensure_remote_access()
-    f = write_tmp('die() {;echo "you died";exit 1;}')
+
+    dest = loc + '/mylib.bash'
+    assert os.path.dirname(dest) != os.path.realpath('.')
+    # create lib
+    os.remove(dest)
+
+    f = write_tmp('#!/bin/bash\ndie() {;echo "you died";exit 1;}')
     l.parse_input(f)
     l.process_export(f)
+    assert os.path.isfile(dest)
+    os.remove(f)
+
+    # update lib
+

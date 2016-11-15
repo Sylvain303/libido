@@ -8,17 +8,23 @@
 #   # expand or update readme_ex0.sh with code defined in 'lib_source' See libido.conf
 #   ./libido.py ../examples/readme_ex0.sh
 #
-# Usage: libido [options] [--] SOURCE_FILE ...
+# Usage:
+#  libido [options] [--] [do]   SOURCE_FILES ...
+#  libido [options] [--] export SOURCE_FILE
+#  libido [options] [--] diff   SOURCE_FILE
+#  libido [options] [--] parse  SOURCE_FILE
 #
-# /!\ WARNING ! None of this is working yet!
 # options:
 #  -v          verbose (messages sent to stderr)
 #  -b=[suffix] backup with suffix (incremental backup)
-#  -r          revert?
-#  -e          export marked piece of code, to remote_project
-#  -o FILE     output to a named file (instead of inline edit) [default: None]
-#  --diff      no change, diff -u SOURCE_FILE result on stdout
+#  -o FILE     output to a named file (instead of inline edit, not with export) [default: None]
 #  -q          quiet, no output on stderr
+#
+# actions:
+#  do       changes SOURCE_FILES, export libido code inplace, default behavior
+#  export   export marked piece of code, to remote_project
+#  diff     no change, `diff -u SOURCE_FILE result` on stdout
+#  parse    no change, parses SOURCE_FILE displaying parsed informations on stdout
 
 # empty line above required ^^
 from __future__ import print_function
@@ -30,8 +36,9 @@ from tempfile import NamedTemporaryFile
 # shutil for move()
 import shutil
 import fnmatch
+
 # pip install --user configparser
-from configparser import ConfigParser, ExtendedInterpolation
+from configparser import ConfigParser, ExtendedInterpolation, MissingSectionHeaderError
 
 
 # docopt : pip install --user docopt=0.6.2
@@ -99,12 +106,19 @@ class libido:
         for d in look_for_config:
             config_file = os.path.join(os.path.expanduser(d), self.config_base)
             if os.path.isfile(config_file):
-                printerr('configparser=%s' % config_file)
-                r = conf_parser.read(config_file)
+                try:
+                    r = conf_parser.read(config_file)
+                except MissingSectionHeaderError as e:
+                    print("wrong format: %s" % config_file)
+                    r = []
+
                 # when a config is found stop
-                if r[0] == config_file:
+                if len(r) > 0 and r[0] == config_file:
+                    printerr('configparser=%s FOUND' % config_file)
                     self.conf = conf_parser
                     break
+
+                printerr('configparser=%s not valid' % config_file)
 
         if self.conf == None:
             raise RuntimeError("no config found")
@@ -201,7 +215,7 @@ class libido:
             dest = filename
             need_tmp = True
 
-        if self.arguments['--diff']:
+        if self.arguments['diff']:
             ovrewrite = False
             # need_tmp will force tmpfile
             need_tmp = True
@@ -217,7 +231,7 @@ class libido:
         out.write(self.lparser.dump_result())
         out.close()
 
-        if self.arguments['--diff']:
+        if self.arguments['diff']:
             os.system("diff -u %s %s" % (filename, out.name))
 
         # finalyze
@@ -228,8 +242,8 @@ class libido:
 
     def process_export(self, filename):
         """
-        process_output() : reparse the filename as an input for our library
-        library destination is given by self.remote_location See ensure_remote_access()
+        process_output() : reparse the filename as an input for our library.
+        Library destination is given by self.remote_location See ensure_remote_access()
         """
         # filename is already parsed as libido
         # we have to parse it as it self
@@ -258,6 +272,7 @@ class libido:
             dp.parse(dest)
 
         if not dp:
+            # create a new export lib
             f = open(dest, 'wt')
             for func in export_f:
                 f.write("# %s\n" % (func))
@@ -277,9 +292,21 @@ class libido:
 
     def ensure_remote_access(self):
         remote_location = self.conf['libido'].get('remote_location')
-        remote_location = os.path.dirname(os.path.expanduser(remote_location))
+        #remote_location = os.path.dirname(os.path.expanduser(remote_location))
         self.remote_location = os.path.realpath(remote_location)
         return self.remote_location
+
+    def process_parse(self, filename):
+        """
+        process_parse() : reparse the filename as for process_export() but only displays
+        result on stdout.
+        """
+        # filename is already parsed as libido input.
+        # we have to parse it as itself
+        p = self.factory.get_parser(filename)
+        p.parse(filename)
+
+        p.print_chunks()
 
 def main():
     # command line processing
@@ -297,22 +324,29 @@ def main():
 
     # destination, default 'None'
     dest = arguments['-o']
-    if arguments['-e']:
+    if arguments['export']:
         if dest != 'None':
-            raise RuntimeError('-o not supported with -e')
+            raise RuntimeError('-o not supported with export')
         else:
             l.ensure_remote_access()
             export = True
 
-    # process filename's agrument, only the first for now
-    filename = arguments['SOURCE_FILE'][0]
+    if len(arguments['SOURCE_FILES']) > 0:
+        # process filename's agrument, only the first for now
+        filename = arguments['SOURCE_FILES'][0]
+    else:
+        # SOURCE_FILES will be set only for 'do', here falling back to SOURCE_FILE without S
+        filename = arguments['SOURCE_FILE']
+
     printerr('filename=%s, dest=%s' % (filename, dest))
 
     l.parse_input(filename)
 
     if export:
         l.process_export(filename)
-    else:
+    elif arguments['parse']:
+        l.process_parse(filename)
+    else: # arguments['do'] default
         l.process_output(filename, dest)
 
 
