@@ -164,6 +164,7 @@ expands `bash_code` here. comment is kept.
 * [cpp](http://gcc.gnu.org/onlinedocs/cpp/) - C preprocessor
 * [sed](https://www.gnu.org/software/sed/manual/sed.html) - stream editor
 * [gpp](http://en.nothingisreal.com/wiki/GPP) - general-purpose preprocessor
+* [bashpp](https://github.com/iwonbigbro/bashpp) - bash #include with unitest
 
 ### template
 
