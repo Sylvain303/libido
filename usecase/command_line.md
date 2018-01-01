@@ -1,5 +1,7 @@
 # libido command line use
 
+most of the listed command doesn't exist at all
+
 ```
 libido list     ==> list available top_level template names or repositories
 libido config   ==> show current config (libido.conf)
@@ -23,7 +25,13 @@ parse input bash code and displays parsed chunks
 ## `libido list`
 ## `libido config`
 ## `libido init`
+
 ## `libido add`
+
+from stdin (or editor `:'<,'>w!libido add`)
+
+cat script.sh | libido add
+
 ## `libido update`
 ## `libido del`
 ## `libido show`

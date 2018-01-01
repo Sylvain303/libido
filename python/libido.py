@@ -311,8 +311,16 @@ class libido:
         p = self.factory.get_parser(filename)
         p.parse(filename)
 
-        # TODO: arguments['-f'] print only functions
-        p.print_chunks()
+        # -f print only functions
+        if self.arguments['-f']:
+            # code extracted from Bash_parser.print_chunks.
+            for name, chunk in p.sorted_chunks():
+                print("%s: start=%d, end=%d" % (
+                    name, chunk['start'], chunk['end']))
+        else:
+            # full print with code content
+            p.print_chunks()
+
 
 def main():
     # command line processing
