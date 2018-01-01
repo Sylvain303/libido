@@ -88,7 +88,7 @@ class libido_parser():
             libido_token = namedtuple('libido_token', 'action args open close')
             return libido_token('verbatim', None, False, True)
 
-        # failure
+        # failure, no libido token recognized
         return None
 
     def assign(self, chunk_name, deps):
@@ -241,7 +241,7 @@ class libido_parser():
                         printerr('parse:%d:dependencies found %s ??' % (n, line.rstrip()))
                         pass
                 else:
-                    printerr('parsre error:%d:%s' % (n, line.rstrip()))
+                    printerr('parse error:%d:%s' % (n, line.rstrip()))
 
         f.close()
         return self.d
@@ -310,6 +310,7 @@ class libido_parser():
         self.resolved_dep[chunk_name]['deps'] = more_dep
 
     def order_chunk(self, list_deps):
+        # duplicate list_deps[]
         copy_deps = list_deps[:]
         copy_deps.sort(lambda a, b:
                 cmp(self.resolved_dep[a]['start'], self.resolved_dep[b]['start']))

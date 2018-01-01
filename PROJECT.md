@@ -25,4 +25,4 @@ main libido will
 ## config parser
 
 
-vim: set ft=markdown
+vim: set ft=markdown:

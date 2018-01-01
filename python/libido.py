@@ -9,24 +9,25 @@
 #   ./libido.py ../examples/readme_ex0.sh
 #
 # Usage:
-#  libido [options] [--] [do]   SOURCE_FILES ...
-#  libido [options] [--] export SOURCE_FILE
-#  libido [options] [--] diff   SOURCE_FILE
-#  libido [options] [--] parse  SOURCE_FILE
+#  libido [options] [--] export     SOURCE_FILE
+#  libido [options] [--] diff       SOURCE_FILE
+#  libido [options] [--] parse [-f] SOURCE_FILE
+#  libido [options] [--] [do]       SOURCE_FILES ...
 #
 # options:
 #  -v          verbose (messages sent to stderr)
 #  -b=[suffix] backup with suffix (incremental backup)
 #  -o FILE     output to a named file (instead of inline edit, not with export) [default: None]
 #  -q          quiet, no output on stderr
+#  -f          show only function name aka: | grep -E '^[^0-9 ]'
 #
 # actions:
-#  do       changes SOURCE_FILES, export libido code inplace, default behavior
+#  do       changes SOURCE_FILES, change libido code inplace, default behavior
 #  export   export marked piece of code, to remote_project
 #  diff     no change, `diff -u SOURCE_FILE result` on stdout
 #  parse    no change, parses SOURCE_FILE displaying parsed informations on stdout
 
-# empty line above required ^^
+# empty line above required, See get_usage() ^^
 from __future__ import print_function
 
 import sys
@@ -35,6 +36,7 @@ import os
 from tempfile import NamedTemporaryFile
 # shutil for move()
 import shutil
+# fnmatch provides support for Unix shell-style wildcards
 import fnmatch
 
 # pip install --user configparser
@@ -62,6 +64,7 @@ def get_usage(filename=None):
     collector = ''
     for l in f:
         if match and re.match(r'^\s*$', l):
+            # finish collecting lines, as we matched an empty line.
             match = False
             break
 
@@ -245,11 +248,13 @@ class libido:
         process_output() : reparse the filename as an input for our library.
         Library destination is given by self.remote_location See ensure_remote_access()
         """
-        # filename is already parsed as libido
-        # we have to parse it as it self
+        # filename is already parsed as libido file ignoring any other
+        # statement.
+        # Now we have to parse it as itself, requesting the correct parser
         p = self.factory.get_parser(filename)
         p.parse(filename)
 
+        # TODO: store of fetch ordered chunks directly from the parser
         tokens =  p.chunks.keys()
         # order as in the file
         tokens.sort(lambda a, b: cmp(p.chunks[a]['start'], p.chunks[b]['start']))
@@ -306,6 +311,7 @@ class libido:
         p = self.factory.get_parser(filename)
         p.parse(filename)
 
+        # TODO: arguments['-f'] print only functions
         p.print_chunks()
 
 def main():

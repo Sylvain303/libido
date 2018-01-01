@@ -12,6 +12,7 @@ Referencing your own `lib_source` local or remote.
 ### Expansion in your code by parsing the code
 
 Enter the text in your vim buffer (here bash):
+**Note for me:** here die is not a VARIABLE but a function name directly
 
 ~~~bash
 # libido: expand die
@@ -24,9 +25,10 @@ and execute a vim function
 :Libido
 ~~~
 
-add the code under the libido marker, as a modified buffer
+This will add the code of `die()` under the libido marker, as a modified buffer
 
 ~~~bash
+# libido: expand die
 die() {
     echo "$*"
     exit 1
@@ -43,13 +45,13 @@ Which represents the equivalent of:
 
 ### Expansion by issuing an `expand`
 
-execute a vim function:
+execute a vim function (not self buffer parsing):
 
 ~~~vim
 :Libido expand die
 ~~~
 
-No code parsing, your current buffer `file_type` detection is automatic, expansion under the cursor.
+No code parsing, your current buffer `file_type` detection is automatic, expansion on the line under the cursor.
 
 ~~~bash
 die() {

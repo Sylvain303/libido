@@ -68,7 +68,7 @@ void p(char *what, char *val)
     StringBuf *lexer_current_line;
     GSList *lines;
 
-    /* declare intger boolean changer for strat conditions */
+    /* declare integer boolean changer for start conditions */
     INT_CHANGER(function_body);
     INT_CHANGER(unparsed_code);
 
@@ -104,7 +104,7 @@ BASH_PONCTUATION    [[\]*<>|!&]{1,2}|==|!=
 <code>.*                RET(CODE);
 <code>\n                BEGIN(0); COLLECT();
 
-    /* WARNING ! specilat start condition can be reached only from the parser */
+    /* WARNING ! special start condition can be reached only from the parser */
 <function_body>{INDENT}         BEGIN(code); RET(INDENT);
 <function_body>{COMMENT}[^\n]+  RET(COMMENT_LINE);
 <function_body>\n               COLLECT();

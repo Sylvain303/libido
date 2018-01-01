@@ -4,15 +4,15 @@ Make your own lib by merging pieces of code into your code.
 
 What?
 
-libido stand for maximizing your pleasure! => lib I do
+libido stands for: maximizing your pleasure! => lib I do
 
 `libido` is a smart text preprocessor/editor which modifies your code inline!
-By inserting comment (or not) with `libido:` keyword you can expand/update some part of your code with your lovely
-crafted snippet.
+
+By inserting comment (or not) with `libido:` keyword you can expand/update some part of your code with your lovely crafted snippet.
 
 OK, a kind of super `sed`, with a nice syntax to extract, fetch, update inline chunk of code. See bellow.
 
-## Status : Prototype
+## Status : Prototype, Playground
 
 This project is a sandbox for idea. It cares about parsing and programming freely.
 
@@ -42,6 +42,7 @@ Yes some other programming languages are also used.
 * ruby
 * bash
 * C++
+* go
 
 
 ## Unittesting
@@ -135,7 +136,7 @@ Note: `open_marker` is `libido:` embeded in comment
 * `LIST`: `VARIABLE`
  * `VARIABLE` ',' `VARIABLE`
 
-`depend` is used inside languages parsers as an dependencies hint.
+`depend` is used inside languages parsers as a dependencies hint.
 
 ### example of syntax
 ~~~
