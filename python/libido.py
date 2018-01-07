@@ -53,7 +53,7 @@ from helper import printerr, quiet
 
 def get_usage(filename=None):
     """
-    get_usage() : only extract top header comment
+    get_usage() : only extract top Usage header in the comment at the beginning
 
     with sed: [[ "$1" == "--help" ]] && { sed -n -e '/^# Usage:/,/^$/ s/^# \?//p' < $0; exit; }
     """
@@ -65,6 +65,7 @@ def get_usage(filename=None):
     for l in f:
         if match and re.match(r'^\s*$', l):
             # finish collecting lines, as we matched an empty line.
+            # we stop the loop
             match = False
             break
 
@@ -245,7 +246,7 @@ class libido:
 
     def process_export(self, filename):
         """
-        process_output() : reparse the filename as an input for our library.
+        process_export() : reparse the filename as an input for our library.
         Library destination is given by self.remote_location See ensure_remote_access()
         """
         # filename is already parsed as libido file ignoring any other
@@ -254,10 +255,11 @@ class libido:
         p = self.factory.get_parser(filename)
         p.parse(filename)
 
-        # TODO: store of fetch ordered chunks directly from the parser
+        # TODO: store ordered chunks (as in source file) directly in the parser
         tokens =  p.chunks.keys()
         # order as in the file
         tokens.sort(lambda a, b: cmp(p.chunks[a]['start'], p.chunks[b]['start']))
+        # TODO: export_f we will be able to filter tokens
         export_f = fnmatch.filter(tokens, '*')
 
         # open destination project
@@ -267,11 +269,12 @@ class libido:
         if re.search(r'%s', dest):
             dest = dest % (p.name)
 
+        # build at fullpath pointing to a source file (ex: ${lib_source}/libido_exported.bash)
         dest = os.path.join(self.remote_location, dest)
 
         dp = None
         if os.path.isfile(dest):
-            # parse destination file, to detect function collision
+            # parse destination file, to detect function's name collision
             dp = self.factory.get_parser(dest)
             dp.ignore_libido_analyze = True
             dp.parse(dest)
@@ -286,6 +289,7 @@ class libido:
 
             printerr("new file, %d func written to '%s'" % (len(export_f), dest))
         else:
+            # dest already exist, we perform overwrite if any.
             for func in export_f:
                 if dp.update_chunk(func, p):
                     printerr("updated chunks: '%s'" % func)
@@ -330,14 +334,16 @@ def main():
 
     printerr(arguments)
 
+    # build main object and give it parsed agurments
     l = libido(arguments)
     l.load_config()
     l.init_factory()
 
+    # command line options
     export = False
-
     # destination, default 'None'
     dest = arguments['-o']
+
     if arguments['export']:
         if dest != 'None':
             raise RuntimeError('-o not supported with export')
@@ -354,6 +360,7 @@ def main():
 
     printerr('filename=%s, dest=%s' % (filename, dest))
 
+    # parse libido tokens only
     l.parse_input(filename)
 
     if export:
