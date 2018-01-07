@@ -1,11 +1,23 @@
+from __future__ import print_function
 import sys
 import configparser
 import os
-
+import re
 
 sys.path.append('..')
 import libido
 
+def file_match(pattern, filename):
+    """
+    file_match() : search regexp pattern in file content, stop at first match
+    """
+    content = open(filename,'r').readlines()
+    reg = re.compile(pattern)
+    for i, line in enumerate(content):
+        if reg.search(line):
+            return True
+
+    return False
 
 def test_readconfig():
     l = libido.libido({})
@@ -41,12 +53,41 @@ def test_get_usage():
     assert lines[-2].find('__future__') == -1
 
 def write_tmp(string_of_code):
+    """
+    write_tmp(): create a temporary file handling the code in the string
+                 auto remove #!shebang indent if any, if input is multiline
+    return : the filename generated
+    """
     from tempfile import NamedTemporaryFile
-    code = string_of_code.split(';')
+    code = []
+    s = None
+    for i, l in enumerate(string_of_code.split("\n")):
+        if len(code) == 0:
+            m = re.search(r'^(\s*)#!/bin/bash', l)
+            if m:
+                # we found the indent
+                s = re.compile('^' + m.group(1))
+
+            if l == "":
+                # remove first emply lines
+                continue
+
+        # no more empty line, we add the code
+        if s:
+            l = s.sub('', l)
+        code.append(l)
+
+
     tmp = NamedTemporaryFile(delete=False)
     tmp.write("\n".join(code))
     tmp.close()
     return tmp.name
+
+def remove_file(fname):
+    try:
+        os.remove(fname)
+    except OSError:
+        pass
 
 def test_ensure_remote_access():
     l = libido.libido({})
@@ -64,16 +105,50 @@ def test_process_export():
     l.init_factory()
     loc = l.ensure_remote_access()
 
+    # mylib.bash is defined in libido.conf
+    # remote_project=mylib.%s
+    # TODO: get it from the libido configparser class
     dest = loc + '/mylib.bash'
     assert os.path.dirname(dest) != os.path.realpath('.')
-    # create lib
-    os.remove(dest)
+    # force to create lib for storing libido exported content
+    remove_file(dest)
 
-    f = write_tmp('#!/bin/bash\ndie() {;echo "you died";exit 1;}')
+    # create lib:
+    f = write_tmp("""
+    #!/bin/bash
+    die() {
+        echo "you died"
+        exit 1
+    }
+    some_func() {
+        echo "param $1"
+    }
+    """)
     l.parse_input(f)
     l.process_export(f)
     assert os.path.isfile(dest)
+    # cleanup input file
     os.remove(f)
 
-    # update lib
+    # update the lib
+    # assert old code is still here
+    assert file_match('you died"$', dest)
+    assert file_match('^some_func', dest)
 
+    f = write_tmp("""
+    #!/bin/bash
+    die() {
+        echo "you died also here"
+        exit 1
+    }
+    """)
+    l.parse_input(f)
+    l.process_export(f)
+
+    # check exported functions in the local repos
+    assert file_match("you died also here", f)
+    assert file_match('^some_func', dest)
+    os.remove(f)
+
+    # assert old code no more here
+    assert not file_match('you died"$', dest)

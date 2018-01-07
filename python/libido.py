@@ -248,6 +248,7 @@ class libido:
         """
         process_export() : reparse the filename as an input for our library.
         Library destination is given by self.remote_location See ensure_remote_access()
+        for now it exports all functions found by the parser
         """
         # filename is already parsed as libido file ignoring any other
         # statement.

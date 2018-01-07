@@ -160,10 +160,11 @@ class libido_parser():
 
     def load_lib(self, force=False):
         """
-        load_lib()
+        load_lib() : load internal lib of code associated with libido.conf. The
+            code is cached, use force=True to reload.
 
             code_lib{} will contain a list of parser instancied with the source code file
-            found in the 'lib_source' config parameter
+            found in the 'lib_source' config parameter.
 
             return int, number of entries in code_lib{} or -1 if not re-run
         """
@@ -177,6 +178,7 @@ class libido_parser():
 
         self.code_lib = {}
         n = 0
+        # loop over local files in config_location
         for f in glob.glob(config_location):
             parser = self.parser_factory.get_parser(f)
             printerr("location=%s, type=%s" % (f, parser.name))
@@ -247,6 +249,10 @@ class libido_parser():
         return self.d
 
     def resolve_dependancies(self):
+        """
+        resolve_dependancies() : with a parsed libido file, look into token_map
+        in order to resolve all dependencies.
+        """
         self.load_lib()
         var = []
         self.resolved_dep = {}
