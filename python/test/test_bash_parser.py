@@ -78,6 +78,7 @@ def test_dependencies():
     assert p.libido_parser.token_map == expect
 
 def test_sorted_chunks():
+    # implicitly also tests get_chunk_keys()
     p = _create_parser()
     p.parse('input.bash')
 

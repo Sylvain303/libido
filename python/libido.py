@@ -9,10 +9,10 @@
 #   ./libido.py ../examples/readme_ex0.sh
 #
 # Usage:
-#  libido [options] [--] export     SOURCE_FILE
+#  libido [options] [--] export [--match=<func_match>...] SOURCE_FILE
 #  libido [options] [--] diff       SOURCE_FILE
 #  libido [options] [--] parse [-f] SOURCE_FILE
-#  libido [options] [--] [do]       SOURCE_FILES ...
+#  libido [options] [--] [do]       SOURCE_FILES...
 #
 # options:
 #  -v          verbose (messages sent to stderr)
@@ -21,6 +21,9 @@
 #  -q          quiet, no output on stderr
 #  -f          show only function name aka: | grep -E '^[^0-9 ]'
 #
+# Options:
+#  -m <func_match>, --match=<func_match>  filter exported function
+
 # actions:
 #  do       changes SOURCE_FILES, change libido code inplace, default behavior
 #  export   export marked piece of code, to remote_project
@@ -247,8 +250,8 @@ class libido:
     def process_export(self, filename):
         """
         process_export() : reparse the filename as an input for our library.
-        Library destination is given by self.remote_location See ensure_remote_access()
-        for now it exports all functions found by the parser
+        Library destination is given by self.remote_location See: ensure_remote_access()
+        For now it exports all functions found by the parser
         """
         # filename is already parsed as libido file ignoring any other
         # statement.
@@ -256,13 +259,27 @@ class libido:
         p = self.factory.get_parser(filename)
         p.parse(filename)
 
-        # TODO: store ordered chunks (as in source file) directly in the parser
-        tokens =  p.chunks.keys()
-        # order as in the file
-        tokens.sort(lambda a, b: cmp(p.chunks[a]['start'], p.chunks[b]['start']))
-        # TODO: export_f we will be able to filter tokens
-        export_f = fnmatch.filter(tokens, '*')
+        export_f = []
+        chunk_names = p.get_chunk_keys()
 
+        # 3 usecase in order: exported, filtered, all
+        # do we have exported chucks
+        if self.lparser.exported_chucks:
+            for c in self.lparser.exported_chucks:
+                if c in chunk_names:
+                    export_f.append(c)
+                else:
+                    printerr("export: '%s' not found in chunks" % (c))
+        elif self.arguments['--match']:
+            for f in self.arguments['--match']:
+                export_f.extend(fnmatch.filter(chunk_names, f))
+            # remove duplicates if any
+            from collections import OrderedDict
+            export_f = list(OrderedDict.fromkeys(export_f))
+        else:
+            export_f = chunk_names
+
+        # TODO: put dest computation code into a parameter method
         # open destination project
         dest = self.conf['libido'].get('remote_project', "libido_exported.%s")
 
@@ -341,7 +358,7 @@ def main():
     l.init_factory()
 
     # command line options
-    export = False
+    action = None
     # destination, default 'None'
     dest = arguments['-o']
 
@@ -350,7 +367,7 @@ def main():
             raise RuntimeError('-o not supported with export')
         else:
             l.ensure_remote_access()
-            export = True
+            action = 'export'
 
     if len(arguments['SOURCE_FILES']) > 0:
         # process filename's agrument, only the first for now
@@ -364,7 +381,7 @@ def main():
     # parse libido tokens only
     l.parse_input(filename)
 
-    if export:
+    if action == 'export':
         l.process_export(filename)
     elif arguments['parse']:
         l.process_parse(filename)

@@ -7,7 +7,7 @@ command line interface with docopt
 filter export, export code to libido `lib_source` pointed in libido.conf
 
 
-## Tagded export
+## Tagged export
 
 A tagged export is a part of the code which is named by libido statement.
 

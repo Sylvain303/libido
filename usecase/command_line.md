@@ -37,6 +37,13 @@ cat script.sh | libido add
 ## `libido show`
 ## `libido do`
 ## `libido export`
+
+export libido chucks to the remote_project. Libido chucks are:
+
+* funtions if nothing is specifided all function are exported
+* `export(...)` only pieces of code listed in export statments
+* `-m` shell-like glob function names from the input
+
 ## `libido diff`
 ## `libido help`
 ## `libido cat`

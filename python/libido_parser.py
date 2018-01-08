@@ -43,6 +43,7 @@ class libido_parser():
         self.code_lib = {}
         self.chunks_resolved = {}
         self.chunks_dep = {}
+        self.exported_chucks = None
 
     def tokenize(self, m):
         """
@@ -82,11 +83,19 @@ class libido_parser():
             match_end = r'\s*\}'
             return libido_token('verbatim', verbatim, True, False)
 
+        # closing brass of the verbatim statement above
         # libido# }
         # -> { action: verbatim, args: None, open=False, close=True }
         if m.match(r'\s*\}\s*$'):
             libido_token = namedtuple('libido_token', 'action args open close')
             return libido_token('verbatim', None, False, True)
+
+        # libido# export(item, item2, ...)
+        # -> { action: export, args: [item, item2, ...] }
+        if m.match(r'export\s*\(([^)]+)\)'):
+            args = [a.strip() for a in m.group(1).split(',')]
+            libido_token = namedtuple('libido_token', 'action args')
+            return libido_token('export', args)
 
         # failure, no libido token recognized
         return None
@@ -242,6 +251,17 @@ class libido_parser():
                         # in specific parser? ex: bash
                         printerr('parse:%d:dependencies found %s ??' % (n, line.rstrip()))
                         pass
+                    elif p.action == 'export':
+                        # create it
+                        if not self.exported_chucks:
+                            self.exported_chucks = []
+
+                        for e in p.args:
+                            # no duplicate
+                            if e not in self.exported_chucks:
+                                self.exported_chucks.append(e)
+                            else:
+                                printerr("export: duplicate export '%s'" % (e))
                 else:
                     printerr('parse error:%d:%s' % (n, line.rstrip()))
 
@@ -318,6 +338,7 @@ class libido_parser():
     def order_chunk(self, list_deps):
         # duplicate list_deps[]
         copy_deps = list_deps[:]
+        # TODO: DRY this key sorting with bash_parser.get_chunk_keys()
         copy_deps.sort(lambda a, b:
                 cmp(self.resolved_dep[a]['start'], self.resolved_dep[b]['start']))
         return copy_deps

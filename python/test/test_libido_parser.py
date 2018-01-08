@@ -121,6 +121,15 @@ def test_tokenize():
     t = p.tokenize(REMatcher('depend(die)'))
     assert t == None
 
+    # export token
+    t = p.tokenize(REMatcher('export(die)'))
+    assert t.action == 'export'
+    assert t.args == [ 'die' ]
+
+    t = p.tokenize(REMatcher('export( you, and_me, and_tea, for2 )'))
+    assert t.action == 'export'
+    assert t.args == [ 'you', 'and_me', 'and_tea', 'for2' ]
+
 def test_dependencies():
     from rematcher import REMatcher
     p = _create_parser()

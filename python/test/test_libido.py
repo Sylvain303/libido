@@ -104,6 +104,7 @@ def test_process_export():
     l.load_config()
     l.init_factory()
     loc = l.ensure_remote_access()
+    l.arguments = { '-m' : False }
 
     # mylib.bash is defined in libido.conf
     # remote_project=mylib.%s
@@ -148,7 +149,27 @@ def test_process_export():
     # check exported functions in the local repos
     assert file_match("you died also here", f)
     assert file_match('^some_func', dest)
-    os.remove(f)
 
     # assert old code no more here
     assert not file_match('you died"$', dest)
+    os.remove(f)
+
+    # with argument -m
+    f = write_tmp("""
+    #!/bin/bash
+    die() {
+        echo "you died"
+        exit 1
+    }
+    some_func() {
+        echo "param $1"
+    }
+    """)
+    l.arguments['-m'] = [ 'some*', 'di' ]
+    os.remove(dest)
+    l.process_export(f)
+    assert not file_match("^die\(\)", dest)
+    assert file_match('^some_func', dest)
+
+    os.remove(f)
+

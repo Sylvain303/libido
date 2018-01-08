@@ -137,11 +137,7 @@ class Bash_parser():
         sorted_chunks(): return a list of pair (chunk_name, code) in the same order
         as in the source code.
         """
-        chunks =  self.chunks.keys()
-        # order as in the file
-        chunks.sort(lambda a, b: cmp(self.chunks[a]['start'], self.chunks[b]['start']))
-
-        return [ (c, self.chunks[c]) for c in chunks ]
+        return [ (c, self.chunks[c]) for c in self.get_chunk_keys() ]
 
     def identify_chunk_outsider(self):
         """
@@ -200,3 +196,14 @@ class Bash_parser():
             # keep the chunk from parsed chunk
             self.chunks[chunk_name]['updated'] = True
             return True
+
+    def get_chunk_keys(self):
+        """
+        get_chunk_keys() : return the chunks name, as seen in the code.
+        """
+        chunk_names =  self.chunks.keys()
+        # order as in the file
+        chunk_names.sort(lambda a, b: cmp(self.chunks[a]['start'], self.chunks[b]['start']))
+
+        return chunk_names
+
