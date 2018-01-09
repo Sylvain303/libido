@@ -40,14 +40,17 @@ def test_get_chunk():
     c2 = p.get_chunk('die')
     assert c2[0] == 'die() {\n'
 
-    # used with update_chunk
+    # used by update_chunk()
     p.new_chunk['die'] = 'die() {\necho pipo\n}\n'.split('\n')
     c3 = p.get_chunk('die')
     assert c3[0] == 'die() {'
     assert c3[1] == 'echo pipo'
 
+    # force read the old chunk not the new one in new_chunk[]
     c4 = p.get_chunk('die', force_old=True)
     assert c2 == c4
+
+    assert None == p.get_chunk('doesnt_exist')
 
 def test_verbatim_start_and_end():
     p = _create_parser()
@@ -151,3 +154,11 @@ def test_update_chunk():
 
     assert p3.get_chunk('func2')[1:] == p2.get_chunk('one')[1:]
     assert p.get_chunk('func2', force_old=True) != p3.get_chunk('func2')
+
+    # add new chunk not present in p
+    p4 = _create_parser()
+    p4.parse('a_new_one.bash')
+    p.update_chunk('a_new_one', p4)
+    assert p.get_chunk('a_new_one')[0].startswith('a_new_one()')
+    assert p.get_chunk('a_new_one', force_old=True) == None
+

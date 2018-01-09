@@ -104,7 +104,6 @@ def test_process_export():
     l.load_config()
     l.init_factory()
     loc = l.ensure_remote_access()
-    l.arguments = { '-m' : False }
 
     # mylib.bash is defined in libido.conf
     # remote_project=mylib.%s
@@ -154,7 +153,6 @@ def test_process_export():
     assert not file_match('you died"$', dest)
     os.remove(f)
 
-    # with argument -m
     f = write_tmp("""
     #!/bin/bash
     die() {
@@ -165,11 +163,15 @@ def test_process_export():
         echo "param $1"
     }
     """)
-    l.arguments['-m'] = [ 'some*', 'di' ]
+    only = [ 'some*', 'di' ]
     os.remove(dest)
-    l.process_export(f)
+    l.process_export(f, only)
     assert not file_match("^die\(\)", dest)
     assert file_match('^some_func', dest)
-
     os.remove(f)
+
+    f = './input.bash'
+    l.parse_input(f)
+    l.process_export(f, ['three'])
+    assert file_match('^three', dest)
 

@@ -15,15 +15,16 @@
 #  libido [options] [--] [do]       SOURCE_FILES...
 #
 # options:
-#  -v          verbose (messages sent to stderr)
-#  -b=[suffix] backup with suffix (incremental backup)
-#  -o FILE     output to a named file (instead of inline edit, not with export) [default: None]
-#  -q          quiet, no output on stderr
-#  -f          show only function name aka: | grep -E '^[^0-9 ]'
+#  -v           verbose (messages sent to stderr)
+#  -b=[suffix]  backup with suffix (incremental backup)
+#  -o FILE      output to a named file (instead of inline edit, not with export) [default: None]
+#  -q           quiet, no output on stderr
+#  -f           show only function name aka: | grep -E '^[^0-9 ]'
+#  -c CONFFILE  override libido.conf with CONFFILE
 #
 # Options:
 #  -m <func_match>, --match=<func_match>  filter exported function
-
+#
 # actions:
 #  do       changes SOURCE_FILES, change libido code inplace, default behavior
 #  export   export marked piece of code, to remote_project
@@ -44,7 +45,6 @@ import fnmatch
 
 # pip install --user configparser
 from configparser import ConfigParser, ExtendedInterpolation, MissingSectionHeaderError
-
 
 # docopt : pip install --user docopt=0.6.2
 from docopt import docopt
@@ -103,15 +103,27 @@ class libido:
         # eval our own location
         self.mydir = os.path.dirname(os.path.realpath(__file__))
 
-    def load_config(self):
+    def load_config(self, this_conf=None):
         """
-        load_config() : search and load libido.conf in `conf`, now use ConfigParser.
+        load_config() : search and load libido.conf in `conf`, use ConfigParser
+        ini file format.
         """
-        look_for_config = [ '.', '.libido', '~/.libido', self.mydir ]
+        if this_conf:
+            look_for_config = [ this_conf ]
+        else:
+            # will search in that order
+            look_for_config = [ '.', '.libido', '~/.libido', self.mydir ]
         conf_parser = ConfigParser(interpolation=ExtendedInterpolation(), default_section='libido')
+        # reset conf
         self.conf = None
         for d in look_for_config:
-            config_file = os.path.join(os.path.expanduser(d), self.config_base)
+            if os.path.isfile(d):
+                # for this_conf, this not a directory to look for libido.conf
+                # it is a filename
+                config_file = d
+            else:
+                config_file = os.path.join(os.path.expanduser(d), self.config_base)
+
             if os.path.isfile(config_file):
                 try:
                     r = conf_parser.read(config_file)
@@ -125,7 +137,7 @@ class libido:
                     self.conf = conf_parser
                     break
 
-                printerr('configparser=%s not valid' % config_file)
+                printerr("configparser: '%s' is not a valid format" % config_file)
 
         if self.conf == None:
             raise RuntimeError("no config found")
@@ -247,11 +259,14 @@ class libido:
         elif need_tmp:
             os.unlink(out.name)
 
-    def process_export(self, filename):
+    def process_export(self, filename, only_those_func=None):
         """
         process_export() : reparse the filename as an input for our library.
         Library destination is given by self.remote_location See: ensure_remote_access()
-        For now it exports all functions found by the parser
+
+        For now it exports all functions found by the parser.
+
+        only_those_func: can be an array of shell like glob, to filter func name
         """
         # filename is already parsed as libido file ignoring any other
         # statement.
@@ -265,13 +280,14 @@ class libido:
         # 3 usecase in order: exported, filtered, all
         # do we have exported chucks
         if self.lparser.exported_chucks:
+            # use a tagged export, written in a libido statement
             for c in self.lparser.exported_chucks:
                 if c in chunk_names:
                     export_f.append(c)
                 else:
                     printerr("export: '%s' not found in chunks" % (c))
-        elif self.arguments['--match']:
-            for f in self.arguments['--match']:
+        elif only_those_func:
+            for f in only_those_func:
                 export_f.extend(fnmatch.filter(chunk_names, f))
             # remove duplicates if any
             from collections import OrderedDict
@@ -301,6 +317,7 @@ class libido:
             # create a new export lib
             f = open(dest, 'wt')
             for func in export_f:
+                printerr('func: %s' % func)
                 f.write("# %s\n" % (func))
                 f.write(libido_parser.flat_line(p.get_chunk(func)))
             f.close()
@@ -354,7 +371,7 @@ def main():
 
     # build main object and give it parsed agurments
     l = libido(arguments)
-    l.load_config()
+    l.load_config(arguments['-c'])
     l.init_factory()
 
     # command line options

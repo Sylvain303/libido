@@ -45,10 +45,21 @@ class Bash_parser():
                 print(" %3d=> %s" % (i, self.lines[i-1].rstrip('\n')))
 
     def get_chunk(self, chunk_name, force_old=False):
+        """
+        get_chunk() : retrieve the lines of code for a chunk updated or not.
+        return : an array of string (lines of code) from the parsed chunk
+                 or None if the chunk doesn't exists.
+        force_old : can be used to read data from chunks{} (before update) instead
+                    of new_chunk{}
+        """
+        # prefere reading in new_chunk
         if not force_old and self.new_chunk.has_key(chunk_name):
             code = self.new_chunk[chunk_name]
         else:
-            code = self.lines[self.chunks[chunk_name]['start']-1:self.chunks[chunk_name]['end']]
+            if self.chunks.has_key(chunk_name):
+                code = self.lines[self.chunks[chunk_name]['start']-1:self.chunks[chunk_name]['end']]
+            else:
+                code = None
         return code
 
 # old verbatim assignment with line delta
@@ -86,14 +97,20 @@ class Bash_parser():
             'function' : 0,
         }
 
+        # store key : {start, end} positions in lines of chunks parsed
         self.chunks = {}
+        # copy of the lines of the last parsed file
         self.lines = []
 
-        # reading file (line by line)
+        # number of line parsed
         self.n = 0
+        # store the last verbatim assign name during the parsing
         self.verbatim = None
+        # for verbatim parsing, boolean for collecing lines
         self.collect = False
+        # copy of the last filename parsed
         self.parsed_fname = None
+        # this dict contains list(string) if update_chunk is called
         self.new_chunk = {}
 
     def parse(self, filename):
@@ -103,6 +120,7 @@ class Bash_parser():
         f = open(filename, 'rU')
         self.parsed_fname = filename
         func_name = None
+        # reading file (line by line)
         for line in f:
             self.n += 1
             self.d['line_count'] += 1
@@ -184,17 +202,28 @@ class Bash_parser():
 
         f.close()
 
-    def update_chunk(self, chunk_name, parser):
-        # get foreign chunks (same API as this parser)
-        code_new = parser.get_chunk(chunk_name)
+    def update_chunk(self, chunk_name, other):
+        """
+        update_chunk() : update a chunk in the parser, with the chunk from
+        another parser. If the code_old doesn't exist, add the chunk as a new
+        one.
+        """
+        # get foreign chunks (it must have the same API as this parser)
+        code_new = other.get_chunk(chunk_name)
         code_old = self.get_chunk(chunk_name)
 
+        if code_new == None:
+            raise RuntimeError('update_chunk:error: chunk not found: %s' % chunk_name)
+
         if code_new == code_old:
+            # same code, no update
             return False
         else:
             self.new_chunk[chunk_name] = code_new
             # keep the chunk from parsed chunk
-            self.chunks[chunk_name]['updated'] = True
+            if code_old:
+                # olny updated if it was present before
+                self.chunks[chunk_name]['updated'] = True
             return True
 
     def get_chunk_keys(self):
