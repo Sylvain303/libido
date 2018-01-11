@@ -10,18 +10,21 @@
 import sys
 import re
 import os
+from collections import OrderedDict
 
 re.UNICODE
 re.LOCALE
 
 # local import
 from rematcher import REMatcher
-from helper import flat_line
+from helper import flat_line, printerr
 
 class Bash_parser():
     def __init__(self, config, libido_parser):
         self.config = config
+        # store copy of the parsed lines
         self.lines = []
+        # a ref on the libido_parser, which can be None, See below.
         self.libido_parser = libido_parser
         # See also init_parser() for other object properties
 
@@ -33,21 +36,47 @@ class Bash_parser():
         else:
             self.ignore_libido_analyze = False
 
-    def print_chunks(self):
+    def print_chunks(self, print_code=True):
         """
-        print_chunks() : simple debug function
+        print_chunks() : formated prints parsed chunks
+        print_code : bool code will be printed
         """
         print("bash parser")
-        for name, chunk in self.sorted_chunks():
-            print("%s: start=%d, end=%d" % (
-                name, chunk['start'], chunk['end']))
-            for i in xrange(chunk['start'], chunk['end']+1):
-                print(" %3d=> %s" % (i, self.lines[i-1].rstrip('\n')))
+
+        # chunks are in order from chunks{} + new_chunk{}
+        l = 0
+        for name in self.get_chunk_keys():
+            modified = False
+            # override with new_chunk{} if any
+            if self.new_chunk.has_key(name):
+                start = l
+                modified = True
+            else:
+                start = self.chunks[name]['start']
+
+            code = self.get_chunk(name)
+            end = start + len(code) - 1
+            print("%s: start=%d, end=%d" % (name, start, end))
+
+            if print_code:
+                i = start
+                for s in self.get_chunk(name):
+                    print(" %3d=> %s" % (i, s.rstrip()))
+                    i += 1
+
+            # next l
+            l = end + 2
+            if not modified:
+                if l != self.chunks[name]['end']+2:
+                    printerr('AssertionError: l=%d, end=%d' % (
+                        l, self.chunks[name]['end']+2
+                        ))
+
 
     def get_chunk(self, chunk_name, force_old=False):
         """
         get_chunk() : retrieve the lines of code for a chunk updated or not.
-        return : an array of string (lines of code) from the parsed chunk
+        return : an array of string (lines of code) from the parsed chunk.
                  or None if the chunk doesn't exists.
         force_old : can be used to read data from chunks{} (before update) instead
                     of new_chunk{}
@@ -62,15 +91,6 @@ class Bash_parser():
                 code = None
         return code
 
-# old verbatim assignment with line delta
-#-                if m.match(r'verbatim\(([^)]+)\)'):
-#-                    collect = true
-#-                    verbatim = m.group(1)
-#-                    self.chunks[verbatim] = { 'start' : n+1 }
-#-                elif m.match(r'\}') and collect:
-#-                    self.chunks[verbatim]['end'] = n-1
-#-                    collect = false
-#-                    verbatim = none
     def verbatim_start(self, verbatim):
         if self.collect:
             raise RuntimeError('parse error:%d: verbatim open nested found' % self.n)
@@ -88,7 +108,7 @@ class Bash_parser():
             raise RuntimeError('parse error:%d: verbatim close unmatched' % self.n)
 
     def init_parser(self):
-        # some counter
+        # some counters
         self.d = {
             'line_count' : 0,
             'comments' : 0,
@@ -97,8 +117,8 @@ class Bash_parser():
             'function' : 0,
         }
 
-        # store key : {start, end} positions in lines of chunks parsed
-        self.chunks = {}
+        # store chunk_name => {start:, end:} positions in lines of chunks parsed
+        self.chunks = OrderedDict()
         # copy of the lines of the last parsed file
         self.lines = []
 
@@ -110,8 +130,9 @@ class Bash_parser():
         self.collect = False
         # copy of the last filename parsed
         self.parsed_fname = None
-        # this dict contains list(string) if update_chunk is called
-        self.new_chunk = {}
+        # this dict contains list(string) (if update_chunk() is called)
+        # this format differ from chunks{} which contains dict(start:, end:)
+        self.new_chunk = OrderedDict()
 
     def parse(self, filename):
         self.init_parser()
@@ -150,25 +171,16 @@ class Bash_parser():
 
         return self.d
 
-    def sorted_chunks(self):
-        """
-        sorted_chunks(): return a list of pair (chunk_name, code) in the same order
-        as in the source code.
-        """
-        return [ (c, self.chunks[c]) for c in self.get_chunk_keys() ]
-
     def identify_chunk_outsider(self):
         """
-        identify_chunk_outsider() : compare all chunks{} and lines[] to find line outside any chunks
+        identify_chunk_outsider() : compare all chunks{} and lines[] to find
+        bloc of lines outside of any chunks.
+        chunks{} : will be filled with with 'outsider_%d' keys => outer_chunk{}
         """
         outsider = 0
-        self.outsider = []
-
-        chunks =  self.sorted_chunks()
         current_l = 1
-
-        for c, chunk in chunks:
-            i = chunk['start']
+        for c in self.chunks.keys():
+            i = self.chunks[c]['start']
             if i > current_l:
                 outsider += 1
                 outer_chunk = {'start' : current_l, 'end' : i - 1}
@@ -190,14 +202,10 @@ class Bash_parser():
 
         f = open(dest, 'wb')
 
+        # Note: the call on identify_chunk_outsider() alter chunks{}
         self.identify_chunk_outsider()
-        chunks =  self.sorted_chunks()
-
-        for c, chunk in chunks:
-            if self.new_chunk.has_key(c):
-                code = self.new_chunk[c]
-            else:
-                code = self.lines[chunk['start']-1:chunk['end']]
+        for c in self.get_chunk_keys():
+            code = self.get_chunk(c)
             f.write(flat_line(code))
 
         f.close()
@@ -220,19 +228,37 @@ class Bash_parser():
             return False
         else:
             self.new_chunk[chunk_name] = code_new
-            # keep the chunk from parsed chunk
             if code_old:
-                # olny updated if it was present before
+                # only updated if it was present before
                 self.chunks[chunk_name]['updated'] = True
             return True
 
+    def compare_chunk_order(self, a, b):
+        if self.chunks.has_key(a):
+            if self.chunks.has_key(b):
+                return cmp(self.chunks[a]['start'], self.chunks[b]['start'])
+            else:
+                # b is in new_chunk{}
+                return -1
+        else:
+            # a is in new_chunk{}, b could also be in new_chunk{}
+            if self.chunks.has_key(a):
+                return 1
+            else:
+                # a and b are in new_chunk{}
+                return -1
+
     def get_chunk_keys(self):
         """
-        get_chunk_keys() : return the chunks name, as seen in the code.
+        get_chunk_keys() : return the chunks name ordered as seen in the code.
         """
-        chunk_names =  self.chunks.keys()
-        # order as in the file
-        chunk_names.sort(lambda a, b: cmp(self.chunks[a]['start'], self.chunks[b]['start']))
+        chunk_names = self.chunks.keys()
+        # only add new chunks in order
+        for n in self.new_chunk.keys():
+            if n not in chunk_names:
+                chunk_names.append(n)
+
+        # TODO: remove delete chunks
 
         return chunk_names
 

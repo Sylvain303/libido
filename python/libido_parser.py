@@ -106,7 +106,7 @@ class libido_parser():
     def add_dependency(self, top_func, deps):
         """
         add_dependency() : top_func will depend on deps. all are chunk_names
-        Which means that top_func, if expanded, will also expand once all related chunks in deps
+        Which means that top_func, if expanded, will also expand once, all related chunks in deps
         See apply_chunk()
         """
         if top_func in self.token_map:

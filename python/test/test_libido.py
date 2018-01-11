@@ -110,7 +110,9 @@ def test_process_export():
     # TODO: get it from the libido configparser class
     dest = loc + '/mylib.bash'
     assert os.path.dirname(dest) != os.path.realpath('.')
+
     # force to create lib for storing libido exported content
+    # so we create it first (also it can exists before the test)
     remove_file(dest)
 
     # create lib:
@@ -127,14 +129,12 @@ def test_process_export():
     l.parse_input(f)
     l.process_export(f)
     assert os.path.isfile(dest)
+    assert file_match('^die', dest)
+    assert file_match('^some_func', dest)
     # cleanup input file
     os.remove(f)
 
-    # update the lib
-    # assert old code is still here
-    assert file_match('you died"$', dest)
-    assert file_match('^some_func', dest)
-
+    # update the lib, we change the code of die()
     f = write_tmp("""
     #!/bin/bash
     die() {
@@ -153,25 +153,51 @@ def test_process_export():
     assert not file_match('you died"$', dest)
     os.remove(f)
 
+    # only add more functions, functions already in dest should stay
+    f = write_tmp("""
+    #!/bin/bash
+    #die() {
+    #    echo "you died"
+    #    exit 1
+    #}
+    more_func() {
+        echo "param $1"
+    }
+    """)
+
+    l.process_export(f)
+    for fn in "die some_func more_func".split():
+        assert file_match("^%s\(\)" % fn, dest)
+
+    # partial import select by glob pattern
+    os.remove(f)
     f = write_tmp("""
     #!/bin/bash
     die() {
-        echo "you died"
-        exit 1
+        echo "you died with another exit code"
+        exit 2
     }
     some_func() {
         echo "param $1"
     }
     """)
+
+    # di doesn't match as glob pattern on die
     only = [ 'some*', 'di' ]
+
+    # we recreate the lib
     os.remove(dest)
+
     l.process_export(f, only)
     assert not file_match("^die\(\)", dest)
     assert file_match('^some_func', dest)
     os.remove(f)
 
+    # import more code into the lib (three depends on two + one) should be
+    # imported too.
     f = './input.bash'
     l.parse_input(f)
-    l.process_export(f, ['three'])
-    assert file_match('^three', dest)
+    l.process_export(f)
+    for fn in "three some_func two one".split():
+        assert file_match("^%s\(\)" % fn, dest)
 

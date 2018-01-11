@@ -42,6 +42,7 @@ from tempfile import NamedTemporaryFile
 import shutil
 # fnmatch provides support for Unix shell-style wildcards
 import fnmatch
+from collections import OrderedDict
 
 # pip install --user configparser
 from configparser import ConfigParser, ExtendedInterpolation, MissingSectionHeaderError
@@ -266,7 +267,7 @@ class libido:
 
         For now it exports all functions found by the parser.
 
-        only_those_func: can be an array of shell like glob, to filter func name
+        only_those_func: can be an array of shell like glob, to filter chunk names
         """
         # filename is already parsed as libido file ignoring any other
         # statement.
@@ -278,7 +279,7 @@ class libido:
         chunk_names = p.get_chunk_keys()
 
         # 3 usecase in order: exported, filtered, all
-        # do we have exported chucks
+        # do we have exported chucks?
         if self.lparser.exported_chucks:
             # use a tagged export, written in a libido statement
             for c in self.lparser.exported_chucks:
@@ -287,12 +288,15 @@ class libido:
                 else:
                     printerr("export: '%s' not found in chunks" % (c))
         elif only_those_func:
+            # remove duplicates if any but keep order
+            collect = OrderedDict()
             for f in only_those_func:
-                export_f.extend(fnmatch.filter(chunk_names, f))
-            # remove duplicates if any
-            from collections import OrderedDict
-            export_f = list(OrderedDict.fromkeys(export_f))
+                # glob like match, could match multiple time the same chunk_name
+                for fmatch in fnmatch.filter(chunk_names, f):
+                    collect[fmatch] = 1
+            export_f = collect.keys()
         else:
+            # All
             export_f = chunk_names
 
         # TODO: put dest computation code into a parameter method
@@ -314,7 +318,7 @@ class libido:
             dp.parse(dest)
 
         if not dp:
-            # create a new export lib
+            # create a new export lib, it doesn't exists yet
             f = open(dest, 'wt')
             for func in export_f:
                 printerr('func: %s' % func)
@@ -325,11 +329,11 @@ class libido:
             printerr("new file, %d func written to '%s'" % (len(export_f), dest))
         else:
             # dest already exist, we perform overwrite if any.
-            for func in export_f:
-                if dp.update_chunk(func, p):
-                    printerr("updated chunks: '%s'" % func)
+            for chunk_name in export_f:
+                if dp.update_chunk(chunk_name, p):
+                    printerr("updated chunks: '%s'" % chunk_name)
                 else:
-                    printerr("chunks: identical '%s'" % func)
+                    printerr("chunks: identical '%s'" % chunk_name)
             dp.write()
 
         return dest
@@ -352,10 +356,7 @@ class libido:
 
         # -f print only functions
         if self.arguments['-f']:
-            # code extracted from Bash_parser.print_chunks.
-            for name, chunk in p.sorted_chunks():
-                print("%s: start=%d, end=%d" % (
-                    name, chunk['start'], chunk['end']))
+            p.print_chunks(print_code=False)
         else:
             # full print with code content
             p.print_chunks()

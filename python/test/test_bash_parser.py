@@ -1,4 +1,4 @@
-#
+
 # bash_parser depends on libido_parser for parsing libido: statement
 #
 import os
@@ -80,16 +80,21 @@ def test_dependencies():
               'two': symbol(tsym='chunk', deps=['one'])}
     assert p.libido_parser.token_map == expect
 
-def test_sorted_chunks():
-    # implicitly also tests get_chunk_keys()
+def test_get_chunk_keys():
     p = _create_parser()
     p.parse('input.bash')
 
+    # compose and ordered list (same order as in input.bash)
     it = "one two three".split()
     i = 0
-    for c, chunk in p.sorted_chunks():
+    for c in p.get_chunk_keys():
         assert c == it[i]
         i += 1
+
+    # add a new chunks and check if its here
+    p.new_chunk['pipo_one'] = [ 'fake' ]
+    p.new_chunk['pipo_two'] = [ 'fake2' ]
+    assert p.get_chunk_keys() == (it + [ 'pipo_one', 'pipo_two' ])
 
 def test_identify_chunk_outsider():
     p = _create_parser()
