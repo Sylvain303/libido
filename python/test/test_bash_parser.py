@@ -7,7 +7,7 @@ sys.path.append('..')
 from tempfile import NamedTemporaryFile
 
 from bash_parser import Bash_parser
-
+from py_test_helper import string_match
 
 class fake_libido_parser:
     def __init__(self):
@@ -84,6 +84,8 @@ def test_get_chunk_keys():
     p = _create_parser()
     p.parse('input.bash')
 
+    assert len(p.get_chunk_keys()) == 3
+
     # compose and ordered list (same order as in input.bash)
     it = "one two three".split()
     i = 0
@@ -96,6 +98,17 @@ def test_get_chunk_keys():
     p.new_chunk['pipo_two'] = [ 'fake2' ]
     assert p.get_chunk_keys() == (it + [ 'pipo_one', 'pipo_two' ])
 
+    # get ordered chunks with outsider_ keys at the good position
+    p.identify_chunk_outsider()
+    assert len(p.get_chunk_keys()) > 3
+    expected = "one two three pipo_one pipo_two".split()
+    assert p.get_chunk_keys() == expected
+
+    expected = "outsider_1 one outsider_2 two outsider_3 three pipo_one pipo_two".split()
+    assert len(expected) == 8
+    assert p.get_chunk_keys(interleave_ousider=True) == expected
+
+
 def test_identify_chunk_outsider():
     p = _create_parser()
     p.parse('input.bash')
@@ -103,19 +116,24 @@ def test_identify_chunk_outsider():
     p.identify_chunk_outsider()
     assert len(p.chunks) == 6
 
-    # without func
-    stat = p.parse('in_with_dep.sh')
-    assert stat['function'] == 0
+    # without function in the source
+    parse_stat = p.parse('in_with_dep.sh')
+    assert parse_stat['function'] == 0
     assert len(p.chunks) == 0
     p.identify_chunk_outsider()
     assert len(p.chunks) == 1
-    assert len(p.get_chunk('outsider_1')) == stat['line_count']
+    assert len(p.get_chunk('outsider_1')) == parse_stat['line_count']
+
+    # call twice
+    p.identify_chunk_outsider()
+    assert len(p.chunks) == 1
+    assert len(p.get_chunk('outsider_1')) == parse_stat['line_count']
 
 def test_write():
     p = _create_parser()
     # without func
-    stat = p.parse('in_with_dep.sh')
-    assert stat['function'] == 0
+    parse_stat = p.parse('in_with_dep.sh')
+    assert parse_stat['function'] == 0
 
     # tmp is automatically deleted  on close
     tmp = NamedTemporaryFile()
@@ -166,4 +184,21 @@ def test_update_chunk():
     p.update_chunk('a_new_one', p4)
     assert p.get_chunk('a_new_one')[0].startswith('a_new_one()')
     assert p.get_chunk('a_new_one', force_old=True) == None
+
+# decorator py.test for capturing stdout testing
+def test_print_chunks(capsys):
+    p = _create_parser()
+    p.parse('for_exporting.bash')
+
+    import copy
+    c1 = copy.deepcopy(p.chunks)
+
+    p.identify_chunk_outsider()
+
+    # ensure some content as been added to chunks{}
+    assert len(c1.keys()) != len(p.chunks.keys())
+
+    p.print_chunks(print_code=False)
+    out, err = capsys.readouterr()
+    assert string_match('myfunc', out)
 

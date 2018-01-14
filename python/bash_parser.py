@@ -36,16 +36,19 @@ class Bash_parser():
         else:
             self.ignore_libido_analyze = False
 
-    def print_chunks(self, print_code=True):
+    def print_chunks(self, print_code=True, print_outsider=False):
         """
         print_chunks() : formated prints parsed chunks
         print_code : bool code will be printed
         """
         print("bash parser")
 
+        if print_outsider:
+            self.identify_chunk_outsider()
+
         # chunks are in order from chunks{} + new_chunk{}
         l = 0
-        for name in self.get_chunk_keys():
+        for name in self.get_chunk_keys(interleave_ousider=print_outsider):
             modified = False
             # override with new_chunk{} if any
             if self.new_chunk.has_key(name):
@@ -175,23 +178,57 @@ class Bash_parser():
         """
         identify_chunk_outsider() : compare all chunks{} and lines[] to find
         bloc of lines outside of any chunks.
-        chunks{} : will be filled with with 'outsider_%d' keys => outer_chunk{}
+
+        It is safe to call this method multiple time, as all gap are filled at
+        first call. So no gap could be filled twice.
+
+        new_chunk{} is not considered, as it will replace chunk inplace via
+        get_chunk(). And added chunk will be appended in get_chunk_keys()
+
+        Modified:
+        chunks{} : will be rebuild with additional keys 'outsider_%d' => outer_chunk{}
+                   The order will be modified as outsider interleave with chunk_names.
+                   outsider are numbered starting at 1.
         """
         outsider = 0
         current_l = 1
+        new_ordered_chunks = OrderedDict()
+
+        # loop over current chunks and find un-collected gap
         for c in self.chunks.keys():
-            i = self.chunks[c]['start']
-            if i > current_l:
+            # TODO: care of new_chunk{} ? size may differ or could be deleted
+            chunk_start = self.chunks[c]['start']
+            if chunk_start > current_l:
+                outer_chunk = {
+                        'start' : current_l,
+                        'end' : chunk_start - 1,
+                        'is_outside' : True,
+                        }
                 outsider += 1
-                outer_chunk = {'start' : current_l, 'end' : i - 1}
-                self.chunks["outsider_%d" % outsider] = outer_chunk
+                new_ordered_chunks["outsider_%d" % outsider] = outer_chunk
+                # continue after the chunk
                 current_l = self.chunks[c]['end'] + 1
 
+            # copy chunk ref
+            new_ordered_chunks[c] = self.chunks[c]
+
+        # all chunks are interleaved with outsider, or none if there's no chunk.
+        # We check if a code bloc is left at the ending of the file.
         end = len(self.lines)
-        if  end > current_l:
-            outer_chunk = {'start' : current_l, 'end' : end}
+        if end > current_l:
+            outer_chunk = {
+                    'start' : current_l,
+                    'end' : end,
+                    'is_outside' : True,
+                    }
             outsider += 1
-            self.chunks["outsider_%d" % outsider] = outer_chunk
+            new_ordered_chunks["outsider_%d" % outsider] = outer_chunk
+
+        # we repalce with the new built OrderedDict
+        self.chunks = new_ordered_chunks
+
+        # could be used in unittests
+        return outsider
 
     def write(self, dest = None):
         """
@@ -204,7 +241,7 @@ class Bash_parser():
 
         # Note: the call on identify_chunk_outsider() alter chunks{}
         self.identify_chunk_outsider()
-        for c in self.get_chunk_keys():
+        for c in self.get_chunk_keys(interleave_ousider=True):
             code = self.get_chunk(c)
             f.write(flat_line(code))
 
@@ -233,27 +270,31 @@ class Bash_parser():
                 self.chunks[chunk_name]['updated'] = True
             return True
 
-    def compare_chunk_order(self, a, b):
-        if self.chunks.has_key(a):
-            if self.chunks.has_key(b):
-                return cmp(self.chunks[a]['start'], self.chunks[b]['start'])
-            else:
-                # b is in new_chunk{}
-                return -1
+    def remove_outsider_key(self, k):
+        """
+        remove_outsider_key() : this is a filter function to be used to get
+        chunk_name without outsider chunks.
+        See: get_chunk_keys(interleave_ousider=True) for usage.
+        """
+        if self.chunks[k].has_key('is_outside'):
+            return False
         else:
-            # a is in new_chunk{}, b could also be in new_chunk{}
-            if self.chunks.has_key(a):
-                return 1
-            else:
-                # a and b are in new_chunk{}
-                return -1
+            return True
 
-    def get_chunk_keys(self):
+    def get_chunk_keys(self, interleave_ousider=False):
         """
-        get_chunk_keys() : return the chunks name ordered as seen in the code.
+        get_chunk_keys() : return a list, the chunks name ordered as seen in the
+        code.
+        interleave_ousider: bool, if True outsider chunks{} are given in
+        good order too. When False (default) only libido parsed chunks are
+        given.
         """
-        chunk_names = self.chunks.keys()
-        # only add new chunks in order
+        if interleave_ousider:
+            chunk_names = self.chunks.keys()
+        else:
+            chunk_names = filter(self.remove_outsider_key, self.chunks)
+
+        # add chunk_names not present in chunks{} (added by update_chunk())
         for n in self.new_chunk.keys():
             if n not in chunk_names:
                 chunk_names.append(n)

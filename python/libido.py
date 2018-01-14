@@ -10,20 +10,21 @@
 #
 # Usage:
 #  libido [options] [--] export [--match=<func_match>...] SOURCE_FILE
-#  libido [options] [--] diff       SOURCE_FILE
-#  libido [options] [--] parse [-f] SOURCE_FILE
-#  libido [options] [--] [do]       SOURCE_FILES...
+#  libido [options] [--] diff SOURCE_FILE
+#  libido [options] [--] parse [-f] [--outsider] SOURCE_FILE
+#  libido [options] [--] [do] SOURCE_FILES...
 #
 # options:
 #  -v           verbose (messages sent to stderr)
 #  -b=[suffix]  backup with suffix (incremental backup)
 #  -o FILE      output to a named file (instead of inline edit, not with export) [default: None]
 #  -q           quiet, no output on stderr
-#  -f           show only function name aka: | grep -E '^[^0-9 ]'
 #  -c CONFFILE  override libido.conf with CONFFILE
 #
 # Options:
 #  -m <func_match>, --match=<func_match>  filter exported function
+#  -f                 show only function name, aka: | grep -E '^[^0-9 ]'
+#  --outsider         show also outsider chunks
 #
 # actions:
 #  do       changes SOURCE_FILES, change libido code inplace, default behavior
@@ -278,7 +279,7 @@ class libido:
         export_f = []
         chunk_names = p.get_chunk_keys()
 
-        # 3 usecase in order: exported, filtered, all
+        # 3 usecase tested in order: exported, filtered, all
         # do we have exported chucks?
         if self.lparser.exported_chucks:
             # use a tagged export, written in a libido statement
@@ -299,7 +300,9 @@ class libido:
             # All
             export_f = chunk_names
 
-        # TODO: put dest computation code into a parameter method
+        # TODO: put 'dest' computation code into a parameter method of the
+        # config object or something new.
+
         # open destination project
         dest = self.conf['libido'].get('remote_project', "libido_exported.%s")
 
@@ -344,22 +347,19 @@ class libido:
         self.remote_location = os.path.realpath(remote_location)
         return self.remote_location
 
-    def process_parse(self, filename):
+    def process_parse(self, filename, print_code=True, print_outsider=False):
         """
-        process_parse() : reparse the filename as for process_export() but only displays
-        result on stdout.
+        process_parse() : filename is reparsed with the language parser.
+                          parsed result is displayed on stdout.
+        print_code:    bool, control the printing of the code too.
+        print_outsider: bool, control if we print outsider chunks too.
         """
         # filename is already parsed as libido input.
         # we have to parse it as itself
         p = self.factory.get_parser(filename)
         p.parse(filename)
 
-        # -f print only functions
-        if self.arguments['-f']:
-            p.print_chunks(print_code=False)
-        else:
-            # full print with code content
-            p.print_chunks()
+        p.print_chunks(print_code, print_outsider)
 
 
 def main():
@@ -371,6 +371,8 @@ def main():
     printerr(arguments)
 
     # build main object and give it parsed agurments
+    # TODO: do not use arguments{} in libido class but pass them as argument
+    # from main()
     l = libido(arguments)
     l.load_config(arguments['-c'])
     l.init_factory()
@@ -402,7 +404,11 @@ def main():
     if action == 'export':
         l.process_export(filename)
     elif arguments['parse']:
-        l.process_parse(filename)
+        # -f print only functions, --outsider prints outsider too
+        l.process_parse(filename, 
+                print_code=(not arguments['-f']),
+                print_outsider=arguments['--outsider']
+                )
     else: # arguments['do'] default
         l.process_output(filename, dest)
 

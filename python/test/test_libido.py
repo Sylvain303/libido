@@ -6,18 +6,7 @@ import re
 
 sys.path.append('..')
 import libido
-
-def file_match(pattern, filename):
-    """
-    file_match() : search regexp pattern in file content, stop at first match
-    """
-    content = open(filename,'r').readlines()
-    reg = re.compile(pattern)
-    for i, line in enumerate(content):
-        if reg.search(line):
-            return True
-
-    return False
+from py_test_helper import file_match
 
 def test_readconfig():
     l = libido.libido({})
