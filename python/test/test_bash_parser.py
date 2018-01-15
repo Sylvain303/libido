@@ -59,13 +59,13 @@ def test_verbatim_start_and_end():
 
     assert p.chunks['code']['start'] == 0
     assert p.verbatim == 'code'
-    assert p.collect
+    assert p.verbatim_collect
 
     p.verbatim_end()
 
     assert p.chunks['code']['end'] == 0
     assert p.verbatim == None
-    assert not p.collect
+    assert not p.verbatim_collect
 
 def test_dependencies():
     # we need a real libido_parser for that
@@ -84,6 +84,7 @@ def test_get_chunk_keys():
     p = _create_parser()
     p.parse('input.bash')
 
+    # by default doesn't list outsider
     assert len(p.get_chunk_keys()) == 3
 
     # compose and ordered list (same order as in input.bash)
@@ -98,36 +99,11 @@ def test_get_chunk_keys():
     p.new_chunk['pipo_two'] = [ 'fake2' ]
     assert p.get_chunk_keys() == (it + [ 'pipo_one', 'pipo_two' ])
 
-    # get ordered chunks with outsider_ keys at the good position
-    p.identify_chunk_outsider()
-    assert len(p.get_chunk_keys()) > 3
-    expected = "one two three pipo_one pipo_two".split()
-    assert p.get_chunk_keys() == expected
-
-    expected = "outsider_1 one outsider_2 two outsider_3 three pipo_one pipo_two".split()
+    # get ordered chunks with outsider keys at the good position
+    assert len(p.get_chunk_keys(interleave_ousider=True)) > 3
+    expected = "001_outsider one 002_outsider two 003_outsider three pipo_one pipo_two".split()
     assert len(expected) == 8
     assert p.get_chunk_keys(interleave_ousider=True) == expected
-
-
-def test_identify_chunk_outsider():
-    p = _create_parser()
-    p.parse('input.bash')
-    assert len(p.chunks) == 3
-    p.identify_chunk_outsider()
-    assert len(p.chunks) == 6
-
-    # without function in the source
-    parse_stat = p.parse('in_with_dep.sh')
-    assert parse_stat['function'] == 0
-    assert len(p.chunks) == 0
-    p.identify_chunk_outsider()
-    assert len(p.chunks) == 1
-    assert len(p.get_chunk('outsider_1')) == parse_stat['line_count']
-
-    # call twice
-    p.identify_chunk_outsider()
-    assert len(p.chunks) == 1
-    assert len(p.get_chunk('outsider_1')) == parse_stat['line_count']
 
 def test_write():
     p = _create_parser()
@@ -146,12 +122,12 @@ def test_write():
 def test_update_chunk():
     p = _create_parser()
     p.parse('for_exporting.bash')
-    assert len(p.chunks) == 2
+    assert len(p.get_chunk_keys()) == 2
 
     code = p.get_chunk('func2')
     assert len(code) == 3
 
-    # hack copy a func from another code
+    # hack!! copy another func from another code (don't do that!)
     p2 = _create_parser()
     p2.parse('input.bash')
     p2.chunks['func2'] = p2.chunks['one']
@@ -172,9 +148,9 @@ def test_update_chunk():
     p3.parse(tmp.name)
     tmp.close()
 
-    assert len(p3.chunks) == 2
-    assert sorted(p3.chunks.keys()) == sorted(['myfunc', 'func2'])
-
+    # still the same number of chunk
+    assert len(p3.get_chunk_keys()) == 2
+    # compare code
     assert p3.get_chunk('func2')[1:] == p2.get_chunk('one')[1:]
     assert p.get_chunk('func2', force_old=True) != p3.get_chunk('func2')
 
@@ -190,15 +166,47 @@ def test_print_chunks(capsys):
     p = _create_parser()
     p.parse('for_exporting.bash')
 
-    import copy
-    c1 = copy.deepcopy(p.chunks)
-
-    p.identify_chunk_outsider()
-
-    # ensure some content as been added to chunks{}
-    assert len(c1.keys()) != len(p.chunks.keys())
-
     p.print_chunks(print_code=False)
     out, err = capsys.readouterr()
     assert string_match('myfunc', out)
+
+def test_parse():
+    p = _create_parser()
+
+    # function and outsider interleaved
+    s = p.parse('input.bash')
+    assert s['function'] == 3
+    assert s['outsider'] == 3
+    assert s['comments'] == 6
+    assert s['libido'] == 3
+
+    assert (s['function'] + s['outsider']) == len(p.get_chunk_keys(interleave_ousider=True))
+
+    # a function with a preceding outsider
+    s = p.parse('some_func.bash')
+    assert s['function'] == 1
+    assert s['outsider'] == 1
+    assert s['comments'] == 1
+    assert s['libido'] == 0
+
+    # no function
+    s = p.parse('in_with_dep.sh')
+    assert s['function'] == 0
+    assert s['outsider'] == 1
+    assert s['comments'] == 5
+    assert s['libido'] == 2
+
+    # a function first and an ending outsider
+    s = p.parse('function_first_end_with_outsider.bash')
+    assert s['function'] == 1
+    assert s['outsider'] == 1
+    assert s['comments'] == 0
+    assert s['libido'] == 0
+
+    # a single function
+    s = p.parse('a_new_one.bash')
+    assert s['function'] == 1
+    assert s['outsider'] == 0
+    assert s['comments'] == 0
+    assert s['libido'] == 0
 

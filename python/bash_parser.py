@@ -4,8 +4,25 @@
 #
 # libido - python prototype
 #
-# bash_parser : parse a bash input file for libido collecing code
-# or as a delegate class for bash input for libido_parser See libido_parser.analyze_line()
+# bash_parser : parse a bash input file for collecting bloc of code in the
+# libido context.
+#
+# It can also act as a delegate class for bash input for libido_parser See libido_parser.analyze_line()
+#
+# Line wise parser able to parse whole functions bloc:
+#
+#  [function] name_of_the_function() {
+#     # match the function definiton in one line with the opening brace on the
+#     # same line. Ending () are mendatory (not in bash).
+#
+#     function body is collected until the closing unindented brace
+#  }
+#
+# The parser also identify 'outsider' which are anything else outside a
+# function.
+#
+# verbatim libido bloc, defined in comment are also parsed, by using a libido
+# parser. Given as constructor argument.
 
 import sys
 import re
@@ -21,14 +38,15 @@ from helper import flat_line, printerr
 
 class Bash_parser():
     def __init__(self, config, libido_parser):
+        # TODO: remove config if not used
         self.config = config
-        # store copy of the parsed lines
-        self.lines = []
         # a ref on the libido_parser, which can be None, See below.
         self.libido_parser = libido_parser
-        # See also init_parser() for other object properties
 
-        # seting this bool at True will disable call to libido_parser.analyze_line()
+        # See also init_parser() for other object properties, created at parse
+        # time.
+
+        # seting this bool at True, will disable call to libido_parser.analyze_line()
         # can be used for testing without a real libido_parser or for local parsing
         # to disable modifing of libido_parser.token_map{}
         if libido_parser is None:
@@ -40,11 +58,9 @@ class Bash_parser():
         """
         print_chunks() : formated prints parsed chunks
         print_code : bool code will be printed
+        print_outsider: bool, outsider will be identified and printed too
         """
         print("bash parser")
-
-        if print_outsider:
-            self.identify_chunk_outsider()
 
         # chunks are in order from chunks{} + new_chunk{}
         l = 0
@@ -69,6 +85,8 @@ class Bash_parser():
 
             # next l
             l = end + 2
+
+            # our assertion check, no fail.
             if not modified:
                 if l != self.chunks[name]['end']+2:
                     printerr('AssertionError: l=%d, end=%d' % (
@@ -94,18 +112,19 @@ class Bash_parser():
                 code = None
         return code
 
+    # parser helper for statement
     def verbatim_start(self, verbatim):
-        if self.collect:
+        if self.verbatim_collect:
             raise RuntimeError('parse error:%d: verbatim open nested found' % self.n)
 
         self.verbatim = verbatim
-        self.collect = True
+        self.verbatim_collect = True
         self.chunks[verbatim] = { 'start' : self.n }
 
     def verbatim_end(self):
-        if self.collect:
+        if self.verbatim_collect:
             self.chunks[self.verbatim]['end'] = self.n
-            self.collect = False
+            self.verbatim_collect = False
             self.verbatim = None
         else:
             raise RuntimeError('parse error:%d: verbatim close unmatched' % self.n)
@@ -118,6 +137,7 @@ class Bash_parser():
             'empty' : 0,
             'libido' : 0,
             'function' : 0,
+            'outsider' : 0,
         }
 
         # store chunk_name => {start:, end:} positions in lines of chunks parsed
@@ -129,13 +149,59 @@ class Bash_parser():
         self.n = 0
         # store the last verbatim assign name during the parsing
         self.verbatim = None
-        # for verbatim parsing, boolean for collecing lines
-        self.collect = False
+        # for verbatim parsing, boolean for collecting lines
+        self.verbatim_collect = False
         # copy of the last filename parsed
         self.parsed_fname = None
         # this dict contains list(string) (if update_chunk() is called)
         # this format differ from chunks{} which contains dict(start:, end:)
         self.new_chunk = OrderedDict()
+
+        # collector for collecting outsider during parsing
+        # for outsider, we start outside.
+        # collected_end isn't needed
+        self.collected_start = 1
+        self.collecting = True
+        # for numbering outsider
+        self.outsider = 0
+
+    # for outsider
+    def start_collecting(self):
+        self.collecting = True
+        # we are called on some end (verbatim or function) so we will collect on
+        # next line
+        self.collected_start = self.n + 1
+
+    def end_collecting(self, end=None):
+        if not self.collecting:
+            raise RuntimeError('end_collecting:%d: called while not collecting' % self.n)
+
+        if end is None:
+            end = self.n - 1
+
+        if self.collected_start > end:
+            # last ending called and the code is finished on a closing brace for
+            # the last function.
+            self.collecting = False
+            # nothing to do
+            return
+
+        self.collecting = False
+        outer_chunk = {
+                'start' : self.collected_start,
+                'end' : end,
+                'is_outside' : True,
+                }
+        self.collected_start = -1
+        # key: 3 digits starting by a number as shell function can't start by a
+        # number
+        self.outsider += 1
+        key = "%03d_outsider" % self.outsider
+        if self.chunks.has_key(key):
+            raise RuntimeError("end_collecting:%d: key already exists '%s'" % (self.n, key))
+        self.chunks[key] = outer_chunk
+        # increase stats
+        self.d['outsider'] += 1
 
     def parse(self, filename):
         self.init_parser()
@@ -153,6 +219,7 @@ class Bash_parser():
             self.lines.append(line)
 
             # match a libido tag
+            # TODO: read libido tag from libido_parser
             if m.match(r'libido:'):
                 self.d['libido'] += 1
                 if not self.ignore_libido_analyze:
@@ -163,84 +230,35 @@ class Bash_parser():
             elif m.match(r'^\s*$'):
                 self.d['empty'] += 1
             elif m.match(r'^(function)?\s*([a-zA-Z][a-zA-Z0-9_]*)\s*\(\)'):
+                self.end_collecting()
                 self.d['function'] += 1
                 func_name = m.group(2)
                 self.chunks[func_name] = { 'start' : self.n }
             elif m.match(r'^\}') and func_name:
+                self.start_collecting()
                 self.chunks[func_name]['end'] = self.n
                 func_name = None
+                # it will collect on next line
+
+        # for the last bloc
+        if self.collecting:
+            self.end_collecting(self.n)
 
         f.close()
 
+        # return stats for unittests
         return self.d
-
-    def identify_chunk_outsider(self):
-        """
-        identify_chunk_outsider() : compare all chunks{} and lines[] to find
-        bloc of lines outside of any chunks.
-
-        It is safe to call this method multiple time, as all gap are filled at
-        first call. So no gap could be filled twice.
-
-        new_chunk{} is not considered, as it will replace chunk inplace via
-        get_chunk(). And added chunk will be appended in get_chunk_keys()
-
-        Modified:
-        chunks{} : will be rebuild with additional keys 'outsider_%d' => outer_chunk{}
-                   The order will be modified as outsider interleave with chunk_names.
-                   outsider are numbered starting at 1.
-        """
-        outsider = 0
-        current_l = 1
-        new_ordered_chunks = OrderedDict()
-
-        # loop over current chunks and find un-collected gap
-        for c in self.chunks.keys():
-            # TODO: care of new_chunk{} ? size may differ or could be deleted
-            chunk_start = self.chunks[c]['start']
-            if chunk_start > current_l:
-                outer_chunk = {
-                        'start' : current_l,
-                        'end' : chunk_start - 1,
-                        'is_outside' : True,
-                        }
-                outsider += 1
-                new_ordered_chunks["outsider_%d" % outsider] = outer_chunk
-                # continue after the chunk
-                current_l = self.chunks[c]['end'] + 1
-
-            # copy chunk ref
-            new_ordered_chunks[c] = self.chunks[c]
-
-        # all chunks are interleaved with outsider, or none if there's no chunk.
-        # We check if a code bloc is left at the ending of the file.
-        end = len(self.lines)
-        if end > current_l:
-            outer_chunk = {
-                    'start' : current_l,
-                    'end' : end,
-                    'is_outside' : True,
-                    }
-            outsider += 1
-            new_ordered_chunks["outsider_%d" % outsider] = outer_chunk
-
-        # we repalce with the new built OrderedDict
-        self.chunks = new_ordered_chunks
-
-        # could be used in unittests
-        return outsider
 
     def write(self, dest = None):
         """
         write() : rebuild the parsed bash source to the same filename or a new one given by dest
         """
         if dest is None:
+            # TODO: write via a tmpfile when overwriting
             dest = self.parsed_fname
 
         f = open(dest, 'wb')
 
-        # Note: the call on identify_chunk_outsider() alter chunks{}
-        self.identify_chunk_outsider()
         for c in self.get_chunk_keys(interleave_ousider=True):
             code = self.get_chunk(c)
             f.write(flat_line(code))

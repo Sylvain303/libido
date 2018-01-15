@@ -6,10 +6,20 @@ command line interface with docopt
 
 filter export, export code to libido `lib_source` pointed in libido.conf
 
-* ALL: parse all chunks in a file and add them to a `lib_source`
-* glob filter: `--match` + dependancy export only matched function
+* ALL: parse all chunks in a file and add them to a `lib_source` - OK
+* glob filter: `--match` + dependancy export only matched function - need
+  dependancy
 * `export()` statement: chunks marked in the source code + dependancy are
-  exported.
+  exported. - some duplicated chunk
+
+add functional testing:
+
+```
+git checkout -- remote_location/mylib.bash
+./libido.py export for_exporting.bash
+# nodup !!
+```
+
 
 ## current
 

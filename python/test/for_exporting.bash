@@ -1,6 +1,9 @@
 #!/bin/bash
 #
-# libido: export *
+# The following libido statement is telling libido to export all functions found inside
+# this source file. Outsider chunks will be ignored.
+#
+# libido: export(*)
 #
 
 echo "some outsider code"

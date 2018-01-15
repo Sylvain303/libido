@@ -261,6 +261,24 @@ class libido:
         elif need_tmp:
             os.unlink(out.name)
 
+    def expand_chunk_names(self, chunk_names, globpat, collector):
+        """
+        expand_chunk_names(): return bool, True if globpat matched.
+        chunk_names: a list, containing all words.
+        globpat: glob like pattern to match in chunk_names.
+        collector: a list to be modified, on succesfull match.
+        """
+        # As pattern macthimg could match multiple time the same chunk_name, OrderedDict will
+        # unduplicates keys. Order is kept, but by filter order too.
+        matched = fnmatch.filter(chunk_names, globpat)
+        if matched:
+            for c in matched:
+                if c not in collector:
+                    collector.append(c)
+            return True
+        else:
+            return False
+
     def process_export(self, filename, only_those_func=None):
         """
         process_export() : reparse the filename as an input for our library.
@@ -280,22 +298,19 @@ class libido:
         chunk_names = p.get_chunk_keys()
 
         # 3 usecase tested in order: exported, filtered, all
+
         # do we have exported chucks?
         if self.lparser.exported_chucks:
             # use a tagged export, written in a libido statement
             for c in self.lparser.exported_chucks:
-                if c in chunk_names:
-                    export_f.append(c)
-                else:
+                r = self.expand_chunk_names(chunk_names, c, export_f)
+                if not r:
                     printerr("export: '%s' not found in chunks" % (c))
         elif only_those_func:
-            # remove duplicates if any but keep order
-            collect = OrderedDict()
+            # expand_chunk_names() takes care of dedup chunk_names.
             for f in only_those_func:
-                # glob like match, could match multiple time the same chunk_name
-                for fmatch in fnmatch.filter(chunk_names, f):
-                    collect[fmatch] = 1
-            export_f = collect.keys()
+                # we ignore unmatched filter
+                self.expand_chunk_names(chunk_names, f, export_f)
         else:
             # All
             export_f = chunk_names
@@ -337,6 +352,7 @@ class libido:
                     printerr("updated chunks: '%s'" % chunk_name)
                 else:
                     printerr("chunks: identical '%s'" % chunk_name)
+            # TODO: if no modified chunks don't write
             dp.write()
 
         return dest

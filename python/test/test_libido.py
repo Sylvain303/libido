@@ -190,3 +190,44 @@ def test_process_export():
     for fn in "three some_func two one".split():
         assert file_match("^%s\(\)" % fn, dest)
 
+def test_expand_chunk_names():
+    l = libido.libido({})
+    chunk_names = """
+    pipo
+    pipo_molo
+    molo
+    myfunc
+    die
+    did_it_again
+    """.split()
+
+    assert len(chunk_names) == 6
+
+    # start collecting chunk_names
+    collector = []
+    r = l.expand_chunk_names(chunk_names, 'm*', collector)
+    assert r == True
+    assert collector == ['molo', 'myfunc' ]
+
+    # add more names
+    assert l.expand_chunk_names(chunk_names, 'die', collector)
+    assert collector == ['molo', 'myfunc', 'die' ]
+
+    # unexistant pattern
+    assert False == l.expand_chunk_names(chunk_names, 'not_found', collector)
+    # collector unchanged
+    assert collector == ['molo', 'myfunc', 'die' ]
+
+    # add all (order is kept but as the collector was filled before)
+    assert l.expand_chunk_names(chunk_names, '*', collector)
+    assert collector == ['molo', 'myfunc', 'die', 'pipo', 'pipo_molo', 'did_it_again']
+
+    # all with a new empty collector
+    collector2 = []
+    assert l.expand_chunk_names(chunk_names, '*', collector2)
+    # in same order
+    assert collector2 == chunk_names
+    # called twice, all found, but not modified
+    assert l.expand_chunk_names(chunk_names, '*', collector2)
+    assert collector2 == chunk_names
+
