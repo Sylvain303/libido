@@ -1,10 +1,25 @@
-#!/usr/bin/python -tt
+#!/usr/bin/python -
 # -*- coding: utf-8 -*-
 # vim: set et ts=4 sw=4 sts=4:
 #
 # libido - python prototype
 #
-# parser for libido embeded syntax, it uses subparser and parser_factory
+# Parser for libido embeded syntax, it uses subparser and parser_factory.
+#
+# Libido syntax is line oriented. Parsing is done line by line. A libido
+# statement is introduced by a libido marker (open_marker), followed by some
+# libido code. Libido syntax can be embedded in foreign parser for delimiting
+# blocs or for describring dependencies or naming exported_chucks. The line is
+# analyzed by tokenize().
+#
+# How this parser works:
+#
+# libido_parser stores token encountered during parsing in token_map{} both
+# chunk_name with their dependency if any, and var_name assignment which are
+# also empty chunk dependant of other chunks.
+#
+# The config gives external information to retrieve chunks in a lib_source
+# repository. The repository must have a local copy available.
 #
 
 from __future__ import print_function
@@ -36,7 +51,7 @@ class libido_parser():
     def reset_parser(self):
         # token_map{} store by chunk names, with dependency as array
         self.token_map = {}
-        # expand_memo{} store where expandsion will occur
+        # expand_memo{} store where expansion will occur
         self.expand_memo = {}
         # input lines
         self.lines = []
@@ -44,6 +59,7 @@ class libido_parser():
         self.chunks_resolved = {}
         self.chunks_dep = {}
         self.exported_chucks = None
+        self.parsed_filename = None
 
     def tokenize(self, m):
         """
@@ -59,7 +75,7 @@ class libido_parser():
             args = [a.strip() for a in m.group(3).split(',')]
             return libido_token('assign', var, parser, args)
 
-        # libido# expand bash_code
+        # libido# expand token_name
         # -> { action: expand, args: bash_code }
         if m.match(r'expand\s+([a-zA-Z_][a-zA-Z0-9_]*)'):
             libido_token = namedtuple('libido_token', 'action args')
@@ -97,17 +113,26 @@ class libido_parser():
             libido_token = namedtuple('libido_token', 'action args')
             return libido_token('export', args)
 
-        # failure, no libido token recognized
+        # no match, no libido token recognized
         return None
 
     def assign(self, chunk_name, deps):
+        """
+        assign() : wraps token_map{} assignment, use it for assigning token and
+        dependencies.
+        """
         self.token_map[chunk_name] = symbol(tsym='var', deps=deps)
 
     def add_dependency(self, top_func, deps):
         """
-        add_dependency() : top_func will depend on deps. all are chunk_names
-        Which means that top_func, if expanded, will also expand once, all related chunks in deps
-        See apply_chunk()
+        add_dependency() : add or append dependency to a token.
+        Which means that if top_func is expanded, it will also expand once, all
+        related chunks in deps.  See apply_chunk()
+
+        top_func: string, this token depends on deps. All are chunk_names.
+        deps: list, other chunk_name which are needed by top_func.
+
+        Modified: token_map{}
         """
         if top_func in self.token_map:
             self.token_map[top_func].deps.extend(deps)
@@ -121,7 +146,12 @@ class libido_parser():
 
     def get_dep(self, chunk_name, rec_seen = None, not_me=False):
         """
-        get_dep() : return dependencies list looked up recursivly from token_map{}
+        get_dep() : return a list which are the dependencies looked up recursivly from token_map{}
+        return: list(string), can be empty []
+
+        chunk_name: string, the token to look for.
+        rec_seen: dict, is a recursiv collector (self initialized)
+        not_me: bool, remove chunk_name from the resulting list, present by default.
         """
         if rec_seen is None:
             rec_seen = {}
@@ -148,6 +178,14 @@ class libido_parser():
             return list(uniq_dep)
 
     def add_expansion(self, num, expand_name):
+        """
+        add_expansion() : store an expansion request at the given line
+
+        num: int, line number of the requested expansion.
+        expand_name: string, the chunk_name to look for.
+
+        Modified: expand_memo{}
+        """
         l = self.expand_memo.get(expand_name)
         if l:
             l.append(num)
@@ -156,48 +194,80 @@ class libido_parser():
 
     def find_chunk(self, chunk_name):
         """
-        find_chunk() : look into 'lib_source' to find the chunk_name, and its line of start
+        find_chunk() : look into 'lib_source' to find chunk_name. Returns a dict
+        containing its starts line, so it can be ordered, and the parsed code.
+
+        return: dict, or None
+        chunk_name: string
         """
         # after load_lib() code_lib{} contains parsed lib, See load_lib()
+        # TODO: don't call load_lib() here, ensure it is called before.
         self.load_lib()
 
         for fname, p in self.code_lib.items():
             if p.chunks.has_key(chunk_name):
                 # lines is a list of str
-                return { 'start' : p.chunks[chunk_name]['start'] , 'lines' : p.get_chunk(chunk_name) }
+                # TODO: try to use OrderedDict to be free of ordering
+                return {
+                         'start' : p.chunks[chunk_name]['start'],
+                         'lines' : p.get_chunk(chunk_name),
+                       }
         return None
 
-    def load_lib(self, force=False):
+    def load_lib(self, force=False, input_list_to_parse=None):
         """
         load_lib() : load internal lib of code associated with libido.conf. The
-            code is cached, use force=True to reload.
+        code is cached, use force=True to reload.
 
-            code_lib{} will contain a list of parser instancied with the source code file
-            found in the 'lib_source' config parameter.
+        return: int, number of entries in code_lib{} or -1 if not re-run
+        force: bool, force reloading
+        input_list_to_parse: None or list(string), filenames to parse as our lib. Alaways force=True.
 
-            return int, number of entries in code_lib{} or -1 if not re-run
+        Modified:
+          code_lib{} is reseted and will contain a list of parser instancied with the source code file
+          found in the 'lib_source' config parameter.
         """
+        if input_list_to_parse:
+          force = True
+        else:
+          input_list_to_parse = []
+
         # if not forced run only once
         if not force and len(self.code_lib) > 0:
+            # use cached parser
             return -1
 
-        config_location = self.config.get('lib_source')
-        if not config_location:
-            raise RuntimeError("load_lib(): 'lib_source' not found, no lib available")
+        if len(input_list_to_parse) == 0:
+          # by default, we read the list of file in our lib from the config.
+          # It can be forced to a specific list of filename. Only those filenames will by parsed ignoring
+          # config_location.
+          config_location = self.config.get('lib_source')
+          if not config_location:
+              raise RuntimeError("load_lib(): 'lib_source' not found, no lib available")
+          input_list_to_parse.extend(glob.glob(config_location))
 
+        # reset
         self.code_lib = {}
         n = 0
         # loop over local files in config_location
-        for f in glob.glob(config_location):
-            parser = self.parser_factory.get_parser(f)
-            printerr("location=%s, type=%s" % (f, parser.name))
-            parser.parse(f)
-            self.code_lib[f] = parser
+        for f in input_list_to_parse:
+            code_parser = self.parser_factory.get_parser(f)
+            printerr("location=%s, type=%s" % (f, code_parser.name))
+            code_parser.parse(f)
+            self.code_lib[f] = code_parser
             n += 1
 
         return n
 
     def apply_chunk(self, chunk_name, chunk_of_code):
+        """
+        apply_chunk(): called during token expansion, replace the line in the
+        output with the given chunk_of_code. The current line which is a libido
+        statement it conserved above the expanded code.
+
+        chunk_name: string, the reference token in expand_memo{}
+        chunk_of_code: string, or list(string)
+        """
         where = self.expand_memo.get(chunk_name)
         for n in where:
             old_l = self.output[n-1]
@@ -207,6 +277,12 @@ class libido_parser():
         """
         analyze_line() : parse a single line of libido code and collect info
         Called from inside languages parser only. See bash_parser.parse()
+
+        parser: parser_object (ex: Bash_parser)
+        matcher: REMatcher object
+
+        Note: parser must provide the following methods:
+        verbatim_start() verbatim_end() add_dependency()
         """
         t = self.tokenize(matcher)
 
@@ -219,10 +295,20 @@ class libido_parser():
                 self.add_dependency(t.what, t.args)
 
     def parse(self, filename):
+        """
+        parse() : parses an input file name, and fill the token_map{} and
+        expand_memo{}. This kind of input, it intended for expansion (expand) or
+        for holding lib_source with dependencies (depend).
+
+        return: dict, parsing statistic for unittests
+
+        filename: string
+        """
         self.reset_parser()
 
         #open file in reading mode unicode
         f = open(filename, 'rU')
+        self.parsed_filename = filename
         # some counter
         self.d = {
                 'line_count' : 0,
@@ -248,8 +334,9 @@ class libido_parser():
                     elif p.action == 'expand':
                         self.add_expansion(n, p.args)
                     elif p.action == 'depend':
-                        # in specific parser? ex: bash
-                        printerr('parse:%d:dependencies found %s ??' % (n, line.rstrip()))
+                        # depend in libido_parser is not associated with
+                        # a syntax. We ignore it. See: analyze_line()
+                        #printerr('parse:%d:dependencies found %s ??' % (n, line.rstrip()))
                         pass
                     elif p.action == 'export':
                         # create it
@@ -262,18 +349,34 @@ class libido_parser():
                                 self.exported_chucks.append(e)
                             else:
                                 printerr("export: duplicate export '%s'" % (e))
+                    else:
+                        printerr("parser error: don't know how to handle action: %s" % p.action)
                 else:
                     printerr('parse error:%d:%s' % (n, line.rstrip()))
 
         f.close()
         return self.d
 
-    def resolve_dependancies(self):
+    def resolve_dependancies(self, auto_parse_input=False):
         """
-        resolve_dependancies() : with a parsed libido file, look into token_map
-        in order to resolve all dependencies.
+        resolve_dependancies() : with a parsed libido file, look into
+        token_map{} in order to resolve all dependencies.
+
+        return: dict, self.resolved_dep{} for unittests
+        raise: RuntimeError
+        auto_parse_input: bool, by default load our lib, and we do not look for
+                          content in the file parsed itself. If True ignore our lib
+                          and use the parsed_filename instead.
+
+        Modified:
+          resolved_dep{}: map token => list(string) or dict(deps:, lines:, start:)
+          missing[]: list(string) unfound token which shoud be empty or an exception is raised.
         """
-        self.load_lib()
+        if auto_parse_input == False:
+            self.load_lib()
+        else:
+            self.load_lib(input_list_to_parse=[self.parsed_filename])
+
         var = []
         self.resolved_dep = {}
         self.missing = []
@@ -311,6 +414,11 @@ class libido_parser():
         """
         sub_dep_resolve() : recursivly resolve all deps for chunk_name into resolved_dep{}
         add missing deps in missing[]
+
+        Modified:
+        resolved_dep{}: token with dependencies now have an extra key
+                        'deps' => list(string)
+        missing[]: may have more missing chunk_name
         """
         if seen is None:
             seen = set()
@@ -325,6 +433,7 @@ class libido_parser():
 
             c = self.find_chunk(tok)
             if c:
+                # c is a dict(start:, lines:) built by find_chunk()
                 self.resolved_dep[tok] = c
             else:
                 self.missing.append(tok)
@@ -336,6 +445,13 @@ class libido_parser():
         self.resolved_dep[chunk_name]['deps'] = more_dep
 
     def order_chunk(self, list_deps):
+        """
+        order_chunk() : order records in list_deps based on their 'start'
+        postion.
+
+        return: list(dict(start:)) a copy of list_deps (list_deps unchanged)
+        list_deps: list(string), which must be key pointing in resolved_dep{}
+        """
         # duplicate list_deps[]
         copy_deps = list_deps[:]
         # TODO: DRY this key sorting with bash_parser.get_chunk_keys()
@@ -346,25 +462,33 @@ class libido_parser():
     def dump_result(self):
         """
         dump_result() : after the main code has been parsed, apply the algorithm to dump all the resulting code:
-            - resolve_dependancies() will find all the chunks from token_map{} with dependencies
+            - resolve_dependancies() will find all the chunks from token_map{} with dependencies.
             - loop over expand_memo{} will retrieve and merge together all chunk_of_code recursivly.
             - apply_chunk() will replace in the output[]
+        return: string, the generated code fatten
+        Modified:
+            token_map{} is filled with resolved dependencies
+            output[] contains expanded lines of code, not flatten
         """
         self.resolve_dependancies()
 
         # duplicate input lines
         self.output = self.lines[:]
+
         # prevent multiple expansion
+        # TODO: could OderedDict also achive that better?
         chunk_expanded = set()
 
-        for tok, places in self.expand_memo.items():
+        # look for all places in the code where to expand some code, and perform expansion in output[] via apply_chunk()
+        for tok in self.expand_memo.keys():
             c = self.resolved_dep.get(tok)
             all_chunk = []
-            # c can be a list (var) or a dict (chunk)
+            # TODO: make it the same obect remove isinstance() testing
+            # c can be a list (tsym=var) or a dict (tsym=chunk)
             if isinstance(c, list):
                 # deps are expanded (list of recursive deps) by resolve_dependancies()
                 deps = self.order_chunk(c)
-                # line expandsion will happen in the next loop
+                # line expansion will happen in the next loop
                 all_chunk.append('# expanded from: %s => %s' % (tok, ','.join(c)))
             else:
                 if tok in chunk_expanded:

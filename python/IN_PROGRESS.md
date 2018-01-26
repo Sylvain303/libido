@@ -10,8 +10,19 @@ filter export, export code to libido `lib_source` pointed in libido.conf
 * glob filter: `--match` + dependancy export only matched function - need
   dependancy
 * `export()` statement: chunks marked in the source code + dependancy are
-  exported. - some duplicated chunk
+  exported. - OK
 
+self exporting inside bash source for export command:
+
+INPUT has dependancy, ok parsed in libido_parser in process_export first re-parsing
+OUTPUT is not libido parser only code parsed.
+
+libido_parser.dump_result() need to be split so we could have some thing for apply_chunk()
+
+  libido_parser.fetch_resolved_chunks() has to be created
+
+
+## TODO
 add functional testing:
 
 ```

@@ -284,13 +284,12 @@ class libido:
         process_export() : reparse the filename as an input for our library.
         Library destination is given by self.remote_location See: ensure_remote_access()
 
-        For now it exports all functions found by the parser.
+        For now it exports all functions found by the sub-parser.
 
-        only_those_func: can be an array of shell like glob, to filter chunk names
+        only_those_func: can be an array of shell like glob, to filter chunk names.
         """
-        # filename is already parsed as libido file ignoring any other
-        # statement.
-        # Now we have to parse it as itself, requesting the correct parser
+        # filename is already parsed as libido file ignoring any other statement.
+        # Now we have to parse it as itself, requesting the correct parser:
         p = self.factory.get_parser(filename)
         p.parse(filename)
 
@@ -315,27 +314,25 @@ class libido:
             # All
             export_f = chunk_names
 
-        # TODO: put 'dest' computation code into a parameter method of the
-        # config object or something new.
-
+        # TODO: put 'dest' computation code into a parameter method of the config object or something new.
         # open destination project
         dest = self.conf['libido'].get('remote_project', "libido_exported.%s")
-
         # auto add parser extension
         if re.search(r'%s', dest):
             dest = dest % (p.name)
-
         # build at fullpath pointing to a source file (ex: ${lib_source}/libido_exported.bash)
         dest = os.path.join(self.remote_location, dest)
 
-        dp = None
+        # do the compare by parsing also dest within its own sub-parser
+        dest_parser = None
         if os.path.isfile(dest):
             # parse destination file, to detect function's name collision
-            dp = self.factory.get_parser(dest)
-            dp.ignore_libido_analyze = True
-            dp.parse(dest)
+            dest_parser = self.factory.get_parser(dest)
+            dest_parser.ignore_libido_analyze = True
+            dest_parser.parse(dest)
 
-        if not dp:
+        # dest_parser does not exists because no dest file exists yet
+        if not dest_parser:
             # create a new export lib, it doesn't exists yet
             f = open(dest, 'wt')
             for func in export_f:
@@ -346,14 +343,17 @@ class libido:
 
             printerr("new file, %d func written to '%s'" % (len(export_f), dest))
         else:
-            # dest already exist, we perform overwrite if any.
+            # dest already exists, we perform overwrite, only if some content are modified.
+            modified = False
             for chunk_name in export_f:
-                if dp.update_chunk(chunk_name, p):
+                if dest_parser.update_chunk(chunk_name, p):
                     printerr("updated chunks: '%s'" % chunk_name)
+                    modified = True
                 else:
                     printerr("chunks: identical '%s'" % chunk_name)
-            # TODO: if no modified chunks don't write
-            dp.write()
+
+            if modified:
+                dest_parser.write()
 
         return dest
 
@@ -418,14 +418,15 @@ def main():
     l.parse_input(filename)
 
     if action == 'export':
-        l.process_export(filename)
+        l.process_export(filename, arguments['--match'])
     elif arguments['parse']:
         # -f print only functions, --outsider prints outsider too
         l.process_parse(filename, 
                 print_code=(not arguments['-f']),
                 print_outsider=arguments['--outsider']
                 )
-    else: # arguments['do'] default
+    else:
+        # arguments['do'] default
         l.process_output(filename, dest)
 
 

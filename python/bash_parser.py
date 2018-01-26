@@ -5,24 +5,31 @@
 # libido - python prototype
 #
 # bash_parser : parse a bash input file for collecting bloc of code in the
-# libido context.
+# libido context. For now, there's 3 kind of code bloc: 
+#   functions, or verbatim chunks and outsider.
 #
-# It can also act as a delegate class for bash input for libido_parser See libido_parser.analyze_line()
+# This parser also provide delegated methods for parsing verbatim input for libido_parser.
+# See libido_parser.analyze_line()
 #
-# Line wise parser able to parse whole functions bloc:
+# Line wise parser is able to parse whole functions bloc:
 #
 #  [function] name_of_the_function() {
-#     # match the function definiton in one line with the opening brace on the
-#     # same line. Ending () are mendatory (not in bash).
+#     # Match the function definiton in one line, anchored on the left (no indent).
+#     # The opening brace is not parsed and can be on the next line.
+#     # The Ending () are mendatory (not in bash) so we distinguish ^identifier of ^function_def().
+#     # See the regexp for more accurate matching, in parse().
 #
-#     function body is collected until the closing unindented brace
+#     function body is collected until the closing unindented brace.
 #  }
 #
 # The parser also identify 'outsider' which are anything else outside a
 # function.
 #
 # verbatim libido bloc, defined in comment are also parsed, by using a libido
-# parser. Given as constructor argument.
+# parser. The libido_parser is given as constructor argument.
+#
+# It is not bash_parser's job to understand libido syntax, but it has to provide delegated methods.
+# The Bash_parser doesn't know about dependancies, it is libido_parser's job.
 
 import sys
 import re
@@ -152,7 +159,7 @@ class Bash_parser():
         # for verbatim parsing, boolean for collecting lines
         self.verbatim_collect = False
         # copy of the last filename parsed
-        self.parsed_fname = None
+        self.parsed_filename = None
         # this dict contains list(string) (if update_chunk() is called)
         # this format differ from chunks{} which contains dict(start:, end:)
         self.new_chunk = OrderedDict()
@@ -208,7 +215,7 @@ class Bash_parser():
 
         #open file in reading mode unicode
         f = open(filename, 'rU')
-        self.parsed_fname = filename
+        self.parsed_filename = filename
         func_name = None
         # reading file (line by line)
         for line in f:
@@ -255,7 +262,7 @@ class Bash_parser():
         """
         if dest is None:
             # TODO: write via a tmpfile when overwriting
-            dest = self.parsed_fname
+            dest = self.parsed_filename
 
         f = open(dest, 'wb')
 

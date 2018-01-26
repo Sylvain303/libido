@@ -105,7 +105,7 @@ def test_process_export():
     remove_file(dest)
 
     # create lib:
-    f = write_tmp("""
+    tmpinput_fname = write_tmp("""
     #!/bin/bash
     die() {
         echo "you died"
@@ -115,35 +115,35 @@ def test_process_export():
         echo "param $1"
     }
     """)
-    l.parse_input(f)
-    l.process_export(f)
+    l.parse_input(tmpinput_fname)
+    l.process_export(tmpinput_fname)
     assert os.path.isfile(dest)
     assert file_match('^die', dest)
     assert file_match('^some_func', dest)
     # cleanup input file
-    os.remove(f)
+    os.remove(tmpinput_fname)
 
     # update the lib, we change the code of die()
-    f = write_tmp("""
+    tmpinput_fname = write_tmp("""
     #!/bin/bash
     die() {
         echo "you died also here"
         exit 1
     }
     """)
-    l.parse_input(f)
-    l.process_export(f)
+    l.parse_input(tmpinput_fname)
+    l.process_export(tmpinput_fname)
 
     # check exported functions in the local repos
-    assert file_match("you died also here", f)
+    assert file_match("you died also here", tmpinput_fname)
     assert file_match('^some_func', dest)
 
     # assert old code no more here
     assert not file_match('you died"$', dest)
-    os.remove(f)
+    os.remove(tmpinput_fname)
 
     # only add more functions, functions already in dest should stay
-    f = write_tmp("""
+    tmpinput_fname = write_tmp("""
     #!/bin/bash
     #die() {
     #    echo "you died"
@@ -154,13 +154,13 @@ def test_process_export():
     }
     """)
 
-    l.process_export(f)
+    l.process_export(tmpinput_fname)
     for fn in "die some_func more_func".split():
         assert file_match("^%s\(\)" % fn, dest)
+    os.remove(tmpinput_fname)
 
     # partial import select by glob pattern
-    os.remove(f)
-    f = write_tmp("""
+    tmpinput_fname = write_tmp("""
     #!/bin/bash
     die() {
         echo "you died with another exit code"
@@ -171,24 +171,41 @@ def test_process_export():
     }
     """)
 
-    # di doesn't match as glob pattern on die
+    # "di" must not match as glob pattern on "die"
     only = [ 'some*', 'di' ]
 
     # we recreate the lib
     os.remove(dest)
 
-    l.process_export(f, only)
+    l.process_export(tmpinput_fname, only)
     assert not file_match("^die\(\)", dest)
     assert file_match('^some_func', dest)
-    os.remove(f)
+    os.remove(tmpinput_fname)
 
     # import more code into the lib (three depends on two + one) should be
     # imported too.
-    f = './input.bash'
-    l.parse_input(f)
-    l.process_export(f)
+    input_fname = './input.bash'
+    l.parse_input(input_fname)
+    # export all (no export statement in input.bash)
+    l.process_export(input_fname)
     for fn in "three some_func two one".split():
         assert file_match("^%s\(\)" % fn, dest)
+    # TODO: add filtering with only to see if dependencies are respected
+
+    # TODO: the following bloc is sensing code, remove an perform correct test arround process_export()
+    #
+    # Test: import with an `export` statement inside the inputfile.
+    # reset our library, it should contain only the exported chunks
+    os.remove(dest)
+
+    input_fname = './for_exporting.bash'
+    l.parse_input(input_fname)
+    # only resolve with parsed input not using any lib. The remote_location is to be modified.
+    deps = l.lparser.resolve_dependancies(auto_parse_input=True)
+    l.process_export(input_fname)
+    for fn in "myfunc func2".split():
+        assert file_match("^%s\(\)" % fn, dest)
+
 
 def test_expand_chunk_names():
     l = libido.libido({})

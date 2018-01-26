@@ -14,6 +14,7 @@ myfunc() {
     echo "c'est ça le pouvoir de la funk!"
 }
 
+# libido: depend func2(myfunc)
 func2() {
     echo "I call $(myfunc)"
 }
