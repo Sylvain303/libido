@@ -51,13 +51,18 @@ class libido_parser():
     def reset_parser(self):
         # token_map{} store by chunk names, with dependency as array
         self.token_map = {}
-        # expand_memo{} store where expansion will occur
+        # expand_memo{} store where expansion will occur.
+        # keys are chunk_names pointing to list(int) index (starting at 1) in lines[] or output[]
         self.expand_memo = {}
-        # input lines
+        # input lines after parse()
         self.lines = []
+        # copy of lines[] after dump_result() with expanded chunks (not flatten)
+        # TODO: should it be reseted here?
+        self.output = []
         self.code_lib = {}
         self.chunks_resolved = {}
         self.chunks_dep = {}
+        # store a list(string) chunk_name if some are parsed
         self.exported_chucks = None
         self.parsed_filename = None
 
@@ -132,7 +137,8 @@ class libido_parser():
         top_func: string, this token depends on deps. All are chunk_names.
         deps: list, other chunk_name which are needed by top_func.
 
-        Modified: token_map{}
+        Modified: 
+          token_map{}
         """
         if top_func in self.token_map:
             self.token_map[top_func].deps.extend(deps)
@@ -147,10 +153,10 @@ class libido_parser():
     def get_dep(self, chunk_name, rec_seen = None, not_me=False):
         """
         get_dep() : return a list which are the dependencies looked up recursivly from token_map{}
-        return: list(string), can be empty []
 
+        return: list(string), can be empty []
         chunk_name: string, the token to look for.
-        rec_seen: dict, is a recursiv collector (self initialized)
+        rec_seen: dict, do not use, it is a recursiv collector (self initialized)
         not_me: bool, remove chunk_name from the resulting list, present by default.
         """
         if rec_seen is None:
@@ -181,7 +187,7 @@ class libido_parser():
         """
         add_expansion() : store an expansion request at the given line
 
-        num: int, line number of the requested expansion.
+        num: int, line number in lines[num-1] of the requested expansion.
         expand_name: string, the chunk_name to look for.
 
         Modified: expand_memo{}
@@ -224,7 +230,7 @@ class libido_parser():
         input_list_to_parse: None or list(string), filenames to parse as our lib. Alaways force=True.
 
         Modified:
-          code_lib{} is reseted and will contain a list of parser instancied with the source code file
+          code_lib{}: is reseted and will contain a list of parser instancied with the source code file
           found in the 'lib_source' config parameter.
         """
         if input_list_to_parse:
@@ -267,6 +273,9 @@ class libido_parser():
 
         chunk_name: string, the reference token in expand_memo{}
         chunk_of_code: string, or list(string)
+
+        Modified:
+            output[] : some are replaced with chunk_of_code as string => list(string)
         """
         where = self.expand_memo.get(chunk_name)
         for n in where:
@@ -359,18 +368,18 @@ class libido_parser():
 
     def resolve_dependancies(self, auto_parse_input=False):
         """
-        resolve_dependancies() : with a parsed libido file, look into
-        token_map{} in order to resolve all dependencies.
+        resolve_dependancies() : with a parsed libido file, look into token_map{} in order to resolve all dependencies.
 
-        return: dict, self.resolved_dep{} for unittests
+        return: dict, ref to resolved_dep{} for unittests
         raise: RuntimeError
-        auto_parse_input: bool, by default load our lib, and we do not look for
-                          content in the file parsed itself. If True ignore our lib
-                          and use the parsed_filename instead.
+        auto_parse_input: bool, by default load our lib, and we do not look for content in the file parsed itself. If
+                          True, ignores our lib and use the parsed_filename instead.
 
         Modified:
-          resolved_dep{}: map token => list(string) or dict(deps:, lines:, start:)
-          missing[]: list(string) unfound token which shoud be empty or an exception is raised.
+          resolved_dep{}: reseted, maps chunk_name => list(string) OR dict(deps:, lines:, start:)
+                          All dependencies are resolved, including chunk_name without dependencies which will have a
+                          single dependency on itself.
+          missing[]: list(string) unfound chunk_name which must be empty or an exception is raised.
         """
         if auto_parse_input == False:
             self.load_lib()
@@ -388,6 +397,7 @@ class libido_parser():
             if name in self.resolved_dep:
                 continue
 
+            # recursivly resolves this chunk_name
             self.sub_dep_resolve(name)
 
         for v in var:
@@ -412,13 +422,14 @@ class libido_parser():
 
     def sub_dep_resolve(self, chunk_name, seen = None):
         """
-        sub_dep_resolve() : recursivly resolve all deps for chunk_name into resolved_dep{}
-        add missing deps in missing[]
+        sub_dep_resolve() : recursivly resolve all deps for chunk_name into resolved_dep{} add missing deps in missing[]
+
+        chunk_name: string to look for
+        seen: an internal recursive set(), don't use it, it is passed recursivly by the method.
 
         Modified:
-        resolved_dep{}: token with dependencies now have an extra key
-                        'deps' => list(string)
-        missing[]: may have more missing chunk_name
+          resolved_dep{}: token with dependencies now have an extra key 'deps' => list(string)
+          missing[]: may have more missing chunk_name
         """
         if seen is None:
             seen = set()
@@ -477,35 +488,13 @@ class libido_parser():
 
         # prevent multiple expansion
         # TODO: could OderedDict also achive that better?
-        chunk_expanded = set()
+        self.chunk_expanded = set()
 
         # look for all places in the code where to expand some code, and perform expansion in output[] via apply_chunk()
         for tok in self.expand_memo.keys():
-            c = self.resolved_dep.get(tok)
-            all_chunk = []
-            # TODO: make it the same obect remove isinstance() testing
-            # c can be a list (tsym=var) or a dict (tsym=chunk)
-            if isinstance(c, list):
-                # deps are expanded (list of recursive deps) by resolve_dependancies()
-                deps = self.order_chunk(c)
-                # line expansion will happen in the next loop
-                all_chunk.append('# expanded from: %s => %s' % (tok, ','.join(c)))
-            else:
-                if tok in chunk_expanded:
-                    continue
-                # add all deps + itself
-                deps = c.get('deps', [])
-                deps = self.order_chunk(deps)
-
-            # fetch sub dependencies if any
-            for d in deps:
-                if d in chunk_expanded:
-                    continue
-                # will raise an exception if d is not in resolved_dep{}
-                all_chunk.extend(self.resolved_dep[d]['lines'])
-                chunk_expanded.add(d)
-
-            self.apply_chunk(tok, all_chunk)
+            all_chunk = self.get_resolved_dep(tok)
+            if all_chunk:
+                self.apply_chunk(tok, all_chunk)
 
         # concatenate all lines flatten
         out = ''
@@ -513,3 +502,32 @@ class libido_parser():
             out += flat_line(l)
 
         return out
+
+    def get_resolved_dep(self, chunk_name):
+        
+        c = self.resolved_dep.get(chunk_name)
+        all_chunk = []
+        # c can be a list (tsym=var) or a dict (tsym=chunk)
+        # TODO: make it the same object remove isinstance() testing
+        if isinstance(c, list):
+            # deps (list of recursive deps) are expanded by resolve_dependancies()
+            deps = self.order_chunk(c)
+            # line expansion will happen in the next loop
+            all_chunk.append('# expanded from: %s => %s' % (chunk_name, ','.join(c)))
+        else:
+            if chunk_name in self.chunk_expanded:
+                return None
+            # add all deps + itself
+            deps = c.get('deps', [])
+            deps = self.order_chunk(deps)
+
+        # fetch sub dependencies if any
+        for d in deps:
+            if d in self.chunk_expanded:
+                return None
+            # will raise an exception if d is not in resolved_dep{}
+            all_chunk.extend(self.resolved_dep[d]['lines'])
+            # done for this chunk
+            self.chunk_expanded.add(d)
+
+        return all_chunk

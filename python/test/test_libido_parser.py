@@ -9,6 +9,8 @@ sys.path.append('..')
 # local lib
 from libido_parser import libido_parser, symbol
 import parser_factory
+from py_test_helper import write_tmp, file_match
+from helper import flat_line
 
 def _find_examples():
     path = os.path.realpath('../../examples/libido/')
@@ -304,3 +306,17 @@ def test_parse():
     assert stats['line_count'] > 0
     assert stats['libido'] > 0
 
+def test_get_resolved_dep():
+    p = _create_parser()
+    p.parse('input.bash')
+    r1 = p.resolve_dependancies(auto_parse_input=True)
+
+    p.chunk_expanded = set()
+    code = p.get_resolved_dep('two')
+
+    # TODO: test without file write
+    tmp = write_tmp(flat_line(code))
+    assert file_match('^one\(\)', tmp)
+    os.remove(tmp)
+
+    

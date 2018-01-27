@@ -1,4 +1,4 @@
-# fonctional testing
+# functional testing
 
 ## folders here
 
@@ -9,7 +9,7 @@
 ## run tests
 
 ~~~bash
-cd python/
+cd ./python
 bats all.bats
 ~~~
 

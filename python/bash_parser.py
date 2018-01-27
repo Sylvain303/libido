@@ -5,7 +5,7 @@
 # libido - python prototype
 #
 # bash_parser : parse a bash input file for collecting bloc of code in the
-# libido context. For now, there's 3 kind of code bloc: 
+# libido context. For now, there's 3 kind of code bloc:
 #   functions, or verbatim chunks and outsider.
 #
 # This parser also provide delegated methods for parsing verbatim input for libido_parser.
@@ -308,8 +308,9 @@ class Bash_parser():
 
     def get_chunk_keys(self, interleave_ousider=False):
         """
-        get_chunk_keys() : return a list, the chunks name ordered as seen in the
-        code.
+        get_chunk_keys() : retrieve all parsed chunk_names.
+
+        return: list(string), the chunks name ordered as seen in the code.
         interleave_ousider: bool, if True outsider chunks{} are given in
         good order too. When False (default) only libido parsed chunks are
         given.

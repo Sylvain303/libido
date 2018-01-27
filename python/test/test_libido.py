@@ -6,7 +6,7 @@ import re
 
 sys.path.append('..')
 import libido
-from py_test_helper import file_match
+from py_test_helper import file_match, write_tmp, remove_file
 
 def test_readconfig():
     l = libido.libido({})
@@ -41,42 +41,6 @@ def test_get_usage():
 
     assert lines[-2].find('__future__') == -1
 
-def write_tmp(string_of_code):
-    """
-    write_tmp(): create a temporary file handling the code in the string
-                 auto remove #!shebang indent if any, if input is multiline
-    return : the filename generated
-    """
-    from tempfile import NamedTemporaryFile
-    code = []
-    s = None
-    for i, l in enumerate(string_of_code.split("\n")):
-        if len(code) == 0:
-            m = re.search(r'^(\s*)#!/bin/bash', l)
-            if m:
-                # we found the indent
-                s = re.compile('^' + m.group(1))
-
-            if l == "":
-                # remove first emply lines
-                continue
-
-        # no more empty line, we add the code
-        if s:
-            l = s.sub('', l)
-        code.append(l)
-
-
-    tmp = NamedTemporaryFile(delete=False)
-    tmp.write("\n".join(code))
-    tmp.close()
-    return tmp.name
-
-def remove_file(fname):
-    try:
-        os.remove(fname)
-    except OSError:
-        pass
 
 def test_ensure_remote_access():
     l = libido.libido({})
@@ -153,7 +117,7 @@ def test_process_export():
         echo "param $1"
     }
     """)
-
+    l.parse_input(tmpinput_fname)
     l.process_export(tmpinput_fname)
     for fn in "die some_func more_func".split():
         assert file_match("^%s\(\)" % fn, dest)
@@ -177,6 +141,7 @@ def test_process_export():
     # we recreate the lib
     os.remove(dest)
 
+    l.parse_input(tmpinput_fname)
     l.process_export(tmpinput_fname, only)
     assert not file_match("^die\(\)", dest)
     assert file_match('^some_func', dest)
@@ -220,6 +185,13 @@ def test_expand_chunk_names():
 
     assert len(chunk_names) == 6
 
+    l.load_config()
+    # create lparser object
+    l.init_factory()
+    # fake assign self dependancies in libido_parser.token_map{}, used by get_dep() in expand_chunk_names()
+    for chunk_name in chunk_names:
+        l.lparser.add_dependency(chunk_name, [ chunk_name ])
+
     # start collecting chunk_names
     collector = []
     r = l.expand_chunk_names(chunk_names, 'm*', collector)
@@ -247,4 +219,17 @@ def test_expand_chunk_names():
     # called twice, all found, but not modified
     assert l.expand_chunk_names(chunk_names, '*', collector2)
     assert collector2 == chunk_names
+
+    # collect with dependancies
+    # before
+    collector3 = []
+    assert l.expand_chunk_names(chunk_names, 'molo', collector3)
+    assert collector3 == ['molo']
+
+    # add some dependencies
+    l.lparser.add_dependency('molo', ['pipo', 'pipo_molo'])
+    collector3 = []
+    assert l.expand_chunk_names(chunk_names, 'molo', collector3)
+    assert sorted(collector3) == sorted(['molo', 'pipo', 'pipo_molo'])
+
 

@@ -54,7 +54,7 @@ from docopt import docopt
 # libido local lib
 import parser_factory
 import libido_parser
-from helper import printerr, quiet
+from helper import printerr, quiet, flat_line
 
 def get_usage(filename=None):
     """
@@ -263,10 +263,12 @@ class libido:
 
     def expand_chunk_names(self, chunk_names, globpat, collector):
         """
-        expand_chunk_names(): return bool, True if globpat matched.
+        expand_chunk_names(): filter a list of chunk_names, with globpat and fill collector.
+
+        return: bool, True if some globpat matched.
         chunk_names: a list, containing all words.
         globpat: glob like pattern to match in chunk_names.
-        collector: a list to be modified, on succesfull match.
+        collector: a list to be modified, on succesfull match chunk_name are appended.
         """
         # As pattern macthimg could match multiple time the same chunk_name, OrderedDict will
         # unduplicates keys. Order is kept, but by filter order too.
@@ -274,7 +276,12 @@ class libido:
         if matched:
             for c in matched:
                 if c not in collector:
-                    collector.append(c)
+                    # TODO: it is exceptional?
+                    try:
+                        chunk_with_deps = self.lparser.get_dep(c)
+                    except RuntimeError:
+                        chunk_with_deps = [ c ]
+                    collector.extend(chunk_with_deps)
             return True
         else:
             return False
@@ -290,17 +297,21 @@ class libido:
         """
         # filename is already parsed as libido file ignoring any other statement.
         # Now we have to parse it as itself, requesting the correct parser:
-        p = self.factory.get_parser(filename)
-        p.parse(filename)
 
-        export_f = []
-        chunk_names = p.get_chunk_keys()
+        # If the input filename has internal dependencies defined as libido statement we resolve them so the export will
+        # be consistant.
+        self.lparser.resolve_dependancies(auto_parse_input=True)
+        # retrieve the internal code parser for our input
+        input_parser = self.lparser.code_lib[filename]
 
+        # selecting chunk_names to export
         # 3 usecase tested in order: exported, filtered, all
+        export_f = []
+        chunk_names = input_parser.get_chunk_keys()
 
         # do we have exported chucks?
         if self.lparser.exported_chucks:
-            # use a tagged export, written in a libido statement
+            # We use a tagged export, written in a libido statement
             for c in self.lparser.exported_chucks:
                 r = self.expand_chunk_names(chunk_names, c, export_f)
                 if not r:
@@ -319,7 +330,7 @@ class libido:
         dest = self.conf['libido'].get('remote_project', "libido_exported.%s")
         # auto add parser extension
         if re.search(r'%s', dest):
-            dest = dest % (p.name)
+            dest = dest % (input_parser.name)
         # build at fullpath pointing to a source file (ex: ${lib_source}/libido_exported.bash)
         dest = os.path.join(self.remote_location, dest)
 
@@ -328,6 +339,8 @@ class libido:
         if os.path.isfile(dest):
             # parse destination file, to detect function's name collision
             dest_parser = self.factory.get_parser(dest)
+            # dest_parser dont have to modifiy our libido_parser so we tell, to not analyze any libido statement in the
+            # destination code
             dest_parser.ignore_libido_analyze = True
             dest_parser.parse(dest)
 
@@ -338,7 +351,7 @@ class libido:
             for func in export_f:
                 printerr('func: %s' % func)
                 f.write("# %s\n" % (func))
-                f.write(libido_parser.flat_line(p.get_chunk(func)))
+                f.write(flat_line(input_parser.get_chunk(func)))
             f.close()
 
             printerr("new file, %d func written to '%s'" % (len(export_f), dest))
@@ -346,7 +359,7 @@ class libido:
             # dest already exists, we perform overwrite, only if some content are modified.
             modified = False
             for chunk_name in export_f:
-                if dest_parser.update_chunk(chunk_name, p):
+                if dest_parser.update_chunk(chunk_name, input_parser):
                     printerr("updated chunks: '%s'" % chunk_name)
                     modified = True
                 else:
@@ -421,7 +434,7 @@ def main():
         l.process_export(filename, arguments['--match'])
     elif arguments['parse']:
         # -f print only functions, --outsider prints outsider too
-        l.process_parse(filename, 
+        l.process_parse(filename,
                 print_code=(not arguments['-f']),
                 print_outsider=arguments['--outsider']
                 )
