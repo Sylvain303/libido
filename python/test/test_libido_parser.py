@@ -204,13 +204,13 @@ def test_analyze_line():
 
     bp.n = 10
     p.analyze_line(bp, REMatcher('verbatim (pipo){'))
-    assert bp.chunks['pipo']['start'] == 10
+    assert bp.chunks['pipo'].start == 10
 
     bp.n = 30
     p.analyze_line(bp, REMatcher('}'))
-    assert bp.chunks['pipo']['end'] == 30
-
-    assert bp.chunks == {'pipo' : {'start': 10, 'end' : 30 }}
+    assert bp.chunks['pipo'].name == 'pipo'
+    assert bp.chunks['pipo'].start == 10
+    assert bp.chunks['pipo'].end == 30
 
 def test_get_dep():
     p = _create_parser()

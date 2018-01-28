@@ -43,6 +43,35 @@ re.LOCALE
 from rematcher import REMatcher
 from helper import flat_line, printerr
 
+class Chunk:
+    chunk_count = 0
+    def __init__(self, start, end=None, name=None, extra=None):
+
+        # store {start:, end:} positions in lines[]
+        self.start = start
+        Chunk.chunk_count += 1
+        self.updated = False
+
+        if end:
+            self.end = end
+
+        if name:
+            self.name = name
+        else:
+            key = "%03d_chunk" % Chunk.chunk_count
+            self.name = key
+
+        if extra:
+            for key, value in extra.items():
+                self.__dict__[key] = value
+
+    def update(self):
+        self.updated = True
+
+    def has_key(self, key):
+        return self.__dict__.has_key(key)
+
+
 class Bash_parser():
     def __init__(self, config, libido_parser):
         # TODO: remove config if not used
@@ -78,7 +107,7 @@ class Bash_parser():
                 start = l
                 modified = True
             else:
-                start = self.chunks[name]['start']
+                start = self.chunks[name].start
 
             code = self.get_chunk(name)
             end = start + len(code) - 1
@@ -95,9 +124,9 @@ class Bash_parser():
 
             # our assertion check, no fail.
             if not modified:
-                if l != self.chunks[name]['end']+2:
+                if l != self.chunks[name].end+2:
                     printerr('AssertionError: l=%d, end=%d' % (
-                        l, self.chunks[name]['end']+2
+                        l, self.chunks[name].end+2
                         ))
 
 
@@ -114,7 +143,7 @@ class Bash_parser():
             code = self.new_chunk[chunk_name]
         else:
             if self.chunks.has_key(chunk_name):
-                code = self.lines[self.chunks[chunk_name]['start']-1:self.chunks[chunk_name]['end']]
+                code = self.lines[self.chunks[chunk_name].start-1:self.chunks[chunk_name].end]
             else:
                 code = None
         return code
@@ -126,11 +155,11 @@ class Bash_parser():
 
         self.verbatim = verbatim
         self.verbatim_collect = True
-        self.chunks[verbatim] = { 'start' : self.n }
+        self.chunks[verbatim] = Chunk(name=verbatim, start=self.n)
 
     def verbatim_end(self):
         if self.verbatim_collect:
-            self.chunks[self.verbatim]['end'] = self.n
+            self.chunks[self.verbatim].end = self.n
             self.verbatim_collect = False
             self.verbatim = None
         else:
@@ -140,14 +169,14 @@ class Bash_parser():
         # some counters
         self.d = {
             'line_count' : 0,
-            'comments' : 0,
+            'comment' : 0,
             'empty' : 0,
             'libido' : 0,
             'function' : 0,
             'outsider' : 0,
         }
 
-        # store chunk_name => {start:, end:} positions in lines of chunks parsed
+        # store chunk_name => Chunk object
         self.chunks = OrderedDict()
         # copy of the lines of the last parsed file
         self.lines = []
@@ -162,11 +191,12 @@ class Bash_parser():
         self.parsed_filename = None
         # this dict contains list(string) (if update_chunk() is called)
         # this format differ from chunks{} which contains dict(start:, end:)
+        # TODO: same format?
         self.new_chunk = OrderedDict()
 
         # collector for collecting outsider during parsing
         # for outsider, we start outside.
-        # collected_end isn't needed
+        # 'collected_end' isn't needed See end_collecting()
         self.collected_start = 1
         self.collecting = True
         # for numbering outsider
@@ -175,8 +205,8 @@ class Bash_parser():
     # for outsider
     def start_collecting(self):
         self.collecting = True
-        # we are called on some end (verbatim or function) so we will collect on
-        # next line
+        # we are called at some end of bloc (verbatim or function or before parsing starts) so we will collect on the
+        # next line.
         self.collected_start = self.n + 1
 
     def end_collecting(self, end=None):
@@ -194,11 +224,7 @@ class Bash_parser():
             return
 
         self.collecting = False
-        outer_chunk = {
-                'start' : self.collected_start,
-                'end' : end,
-                'is_outside' : True,
-                }
+        outer_chunk = Chunk(start=self.collected_start, end=end, extra={'is_outside' : True})
         self.collected_start = -1
         # key: 3 digits starting by a number as shell function can't start by a
         # number
@@ -206,17 +232,22 @@ class Bash_parser():
         key = "%03d_outsider" % self.outsider
         if self.chunks.has_key(key):
             raise RuntimeError("end_collecting:%d: key already exists '%s'" % (self.n, key))
+        outer_chunk.name = key
         self.chunks[key] = outer_chunk
         # increase stats
         self.d['outsider'] += 1
 
     def parse(self, filename):
+        # all object properties are initilazed here
         self.init_parser()
 
         #open file in reading mode unicode
         f = open(filename, 'rU')
         self.parsed_filename = filename
         func_name = None
+        current_parsing = None
+
+        self.start_collecting()
         # reading file (line by line)
         for line in f:
             self.n += 1
@@ -229,23 +260,29 @@ class Bash_parser():
             # TODO: read libido tag from libido_parser
             if m.match(r'libido:'):
                 self.d['libido'] += 1
+                current_parsing = 'libido'
                 if not self.ignore_libido_analyze:
                     self.libido_parser.analyze_line(self, m)
 
             if m.match(r'^\s*#'):
-                self.d['comments'] += 1
+                self.d['comment'] += 1
+                current_parsing = 'comment'
             elif m.match(r'^\s*$'):
                 self.d['empty'] += 1
+                current_parsing = None
             elif m.match(r'^(function)?\s*([a-zA-Z][a-zA-Z0-9_]*)\s*\(\)'):
                 self.end_collecting()
                 self.d['function'] += 1
+                current_parsing = 'function'
                 func_name = m.group(2)
-                self.chunks[func_name] = { 'start' : self.n }
+                self.chunks[func_name] = Chunk(name=func_name, start=self.n)
             elif m.match(r'^\}') and func_name:
                 self.start_collecting()
-                self.chunks[func_name]['end'] = self.n
+                self.chunks[func_name].end = self.n
                 func_name = None
+                current_parsing = None
                 # it will collect on next line
+            # end of for lines loop
 
         # for the last bloc
         if self.collecting:
@@ -290,9 +327,9 @@ class Bash_parser():
             return False
         else:
             self.new_chunk[chunk_name] = code_new
+            # the chunk is updated only if it was present before
             if code_old:
-                # only updated if it was present before
-                self.chunks[chunk_name]['updated'] = True
+                self.chunks[chunk_name].update()
             return True
 
     def remove_outsider_key(self, k):

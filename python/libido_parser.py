@@ -215,7 +215,7 @@ class libido_parser():
                 # lines is a list of str
                 # TODO: try to use OrderedDict to be free of ordering
                 return {
-                         'start' : p.chunks[chunk_name]['start'],
+                         'start' : p.chunks[chunk_name].start,
                          'lines' : p.get_chunk(chunk_name),
                        }
         return None

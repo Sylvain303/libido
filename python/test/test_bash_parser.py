@@ -57,13 +57,13 @@ def test_verbatim_start_and_end():
     p.init_parser()
     p.verbatim_start('code')
 
-    assert p.chunks['code']['start'] == 0
+    assert p.chunks['code'].start == 0
     assert p.verbatim == 'code'
     assert p.verbatim_collect
 
     p.verbatim_end()
 
-    assert p.chunks['code']['end'] == 0
+    assert p.chunks['code'].end == 0
     assert p.verbatim == None
     assert not p.verbatim_collect
 
@@ -133,7 +133,7 @@ def test_update_chunk():
     p2.chunks['func2'] = p2.chunks['one']
 
     p.update_chunk('func2', p2)
-    assert p.chunks['func2']['updated']
+    assert p.chunks['func2'].updated
     assert p.new_chunk['func2'] == p2.get_chunk('func2')
 
     # the code still contains one() not func2()
@@ -177,7 +177,7 @@ def test_parse():
     s = p.parse('input.bash')
     assert s['function'] == 3
     assert s['outsider'] == 3
-    assert s['comments'] == 6
+    assert s['comment'] == 6
     assert s['libido'] == 3
 
     assert (s['function'] + s['outsider']) == len(p.get_chunk_keys(interleave_ousider=True))
@@ -186,27 +186,27 @@ def test_parse():
     s = p.parse('some_func.bash')
     assert s['function'] == 1
     assert s['outsider'] == 1
-    assert s['comments'] == 1
+    assert s['comment'] == 1
     assert s['libido'] == 0
 
     # no function
     s = p.parse('in_with_dep.sh')
     assert s['function'] == 0
     assert s['outsider'] == 1
-    assert s['comments'] == 5
+    assert s['comment'] == 5
     assert s['libido'] == 2
 
     # a function first and an ending outsider
     s = p.parse('function_first_end_with_outsider.bash')
     assert s['function'] == 1
     assert s['outsider'] == 1
-    assert s['comments'] == 0
+    assert s['comment'] == 0
     assert s['libido'] == 0
 
     # a single function
     s = p.parse('a_new_one.bash')
     assert s['function'] == 1
     assert s['outsider'] == 0
-    assert s['comments'] == 0
+    assert s['comment'] == 0
     assert s['libido'] == 0
 

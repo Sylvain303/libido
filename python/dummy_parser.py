@@ -22,7 +22,7 @@ class dummy_parser():
         # some counter
         self.d = {
                 'line_count' : 0,
-                'comments' : 0,
+                'comment' : 0,
                 'empty' : 0,
                 'libido' : 0,
                 }
@@ -43,7 +43,7 @@ class dummy_parser():
             if m.match(r'libido:'):
                 self.d['libido'] += 1
             if m.match(r'^\s*#'):
-                self.d['comments'] += 1
+                self.d['comment'] += 1
             elif m.match(r'^\s*$'):
                 self.d['empty'] += 1
 
